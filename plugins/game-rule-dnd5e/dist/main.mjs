@@ -14896,7 +14896,7 @@ var DndStatsCharacterUIPage = ({
       value: currentSettings.backstory || "",
       onChange: (e) => handleChange("backstory", e.target.value),
       rows: 5,
-      placeholder: "Enter prompt guidance for your character's backstory... or leave it blank for the system generate one for you. \n Use simple sentences to highlight the attribute score's interpretation and to describe your character's background, personality, and motivations."
+      placeholder: "Enter prompt guidance for your character's backstory... or leave it blank for the system generate one for you. \r\n Use simple sentences to highlight the attribute score's interpretation and to describe your character's background, personality, and motivations."
     }
   )), /* @__PURE__ */ React.createElement(injectedRadixThemes.Flex, { gap: "2", mt: "4", justify: "end" }, " ", /* @__PURE__ */ React.createElement(injectedRadixThemes.Button, { size: "4", onClick: handleApply }, "Apply Changes"), /* @__PURE__ */ React.createElement(injectedRadixThemes.Button, { size: "4", onClick: () => setCurrentSettings(generateDefaultDnDStats(injectedRpgDiceRoller)), variant: "outline" }, "Re-roll"), " ")));
 };

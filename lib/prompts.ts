@@ -4,6 +4,7 @@
 import { convertLocationChangeEventToText, getApproximateTokenCount, getContext } from "./context";
 import * as schemas from "./schemas";
 import type { LocationChangeEvent, State } from "./state";
+import { getActiveGameRuleLogic } from "./engine";
 
 export interface Prompt {
   system: string;
@@ -118,7 +119,7 @@ const makeMainPromptPreamble = (
 ): string => `This is a fantasy adventure RPG set in the world of ${state.world.name}. ${state.world.description}
 
 The protagonist (who you should refer to as "you" in your narration, as the adventure happens from their perspective)
-is ${state.protagonist.name}. ${state.protagonist.biography}`;
+ is ${state.protagonist.name}. ${state.protagonist.biography}`;
 
 /**
  * @function makeMainPrompt
