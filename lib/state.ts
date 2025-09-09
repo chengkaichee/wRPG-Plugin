@@ -7,8 +7,15 @@ import type * as z from "zod/v4";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { immer } from "zustand/middleware/immer";
+//20250904 - US_P1_S1_1 Inject Granular Services to plugin.init
 import type { Backend } from "./backend";
+import type { Context } from "@/app/plugins";
+import type { IAppLibs } from "@/app/services/AppLibs";
+import type { IAppBackend } from "@/app/services/AppBackend";
+import type { IAppStateManager } from "@/app/services/AppStateManager";
+import type { IAppUI } from "@/app/services/AppUI";
 import * as schemas from "./schemas";
+import { Prompt } from "./prompts";
 
 /**
  * @typedef {z.infer<typeof schemas.View>} View
@@ -131,6 +138,146 @@ export const initialState: State = schemas.State.parse({
 });
 
 /**
+ * @interface CheckDefinition
+ * @description Defines the parameters for a specific check (e.g., a skill check, an attribute check).
+ */
+export interface CheckDefinition {
+  type: string; // e.g., "strength", "stealth", "perception"
+  difficultyClass: number; // The target number to beat for a successful check.
+  modifiers?: string[]; // Optional: The character attribute and modifiers relevant to the check (e.g., "strength", "dexterity").
+}
+
+/**
+ * @interface CheckResult
+ * @description Captures the outcome of a CheckDefinition being resolved.
+ */
+export interface CheckResult {
+  success: boolean; // True if the check was successful, false otherwise.
+  message: string; // A descriptive message about the check's outcome.
+  roll?: number; // Optional: The result of the dice roll, if applicable.
+}
+
+/**
+ * @interface CheckResolutionResult
+ * @description Captures the detailed outcome of a CheckDefinition being resolved, including consequences.
+ */
+export interface CheckResolutionResult {
+  resultStatement: string; // The factual outcome of the check (e.g., "You passed the check").
+  consequenceLog?: string[]; // Optional: A list of high-level consequences applied (e.g., "Goblin 1 took 15 damage", "Goblin 1 is dead", "Longsword broke").
+}
+
+/**
+ * @interface RaceDefinition
+ * @description Expands on simply listing race names, including a description for lore and narrative material.
+ */
+export interface RaceDefinition {
+  name: string;
+  description: string; // Lore or narrative material for the race
+}
+
+/**
+ * @interface ClassDefinition
+ * @description Provides a class name and a description for lore and narrative material.
+ */
+export interface ClassDefinition {
+  name: string;
+  description: string; // Lore or narrative material for the class
+}
+
+/**
+ * @interface IGameRuleLogic
+ * @description Defines a set of optional methods that any game rule (either the default or a plugin-provided one) can implement.
+ */
+export interface IGameRuleLogic {
+  /**
+   * @method getBiographyGuidance
+   * @description Provides a statement that augments the default prompt in `generateProtagonistPrompt`, influencing the protagonist's background, personality, and appearance based on the plugin's internal interpretation of stats.
+   * This statement will be inserted into the `generateProtagonistPrompt` at a designated placeholder (e.g., `[PLUGIN_PROTAGONIST_DESCRIPTION]`).
+   * (Note: The `Character` type is defined in `lib/schemas.ts` and includes properties like `name`, `gender`, `race`, `biography`, `locationIndex`.)
+   * @returns {string} A statement to augment the protagonist generation prompt.
+   */
+  getBiographyGuidance?(): string;
+
+  /**
+   * @method modifyProtagonistPrompt
+   * @description Alters the PC's background to better suit the game world (e.g., magic is very rare or this game world is mostly water).
+   * @param {Prompt} originalPrompt - The original prompt for protagonist generation is read from core application and used as the basis to construct a modified prompt.
+   * (Note: The `Prompt` type is defined in `lib/prompts.ts` and has `system: string; user: string;` properties.)
+   * @returns {Prompt} The modified prompt.
+   */
+  modifyProtagonistPrompt?(originalPrompt: Prompt): Prompt;
+
+  /**
+   * @method getAvailableRaces
+   * @description Provides a list of available races for character creation, including lore for narration.
+   * This can impact the character's backstory and story plots due to different race dynamics and world setting.
+   * @returns {RaceDefinition[]} An array of race definitions.
+   */
+  getAvailableRaces?(): RaceDefinition[];
+
+  /**
+   * @method getAvailableClasses
+   * @description Provides a list of available classes for character creation, including lore for narration.
+   * This can influence the narration by providing game world flavor or attitude towards the PC's class (much like how people treat a doctor vs. a janitor).
+   * @returns {ClassDefinition[]} An array of class definitions.
+   */
+  getAvailableClasses?(): ClassDefinition[];
+
+  /**
+   * @method getActionChecks
+   * @description Specifies what checks are required for a given action, based on the action and current context.
+   * This method is triggered when an action is passed to `narratePrompt`.
+   * Its implementation will typically involve constructing an LLM prompt, making an API call, and parsing/validating the LLM's JSON response against the `CheckDefinition` schema.
+   * @param {string} action - The raw action string performed by the protagonist.
+   * @param {WritableDraft<State>} context - The current game state. (Note: Direct mutation of this `WritableDraft` object is the intended way to update state.)
+   * @returns {Promise<CheckDefinition[]>} A promise that resolves to an array of check definitions. If the LLM response is invalid or unparseable, an empty array should be returned as a graceful fallback.
+   */
+  getActionChecks?(action: string, context: WritableDraft<State>): Promise<CheckDefinition[]>;
+
+  /**
+   * @method resolveCheck
+   * @description Resolves a game rule check, utilizing rpg-dice-roller, and returns the result as a statement.
+   * The plugin will use its internal rules to determine the character's appropriate stat and skill modifier.
+   * This statement will be incorporated into the `narratePrompt`'s output, typically after the action description.
+   * @param {CheckDefinition} check - The definition of the check to resolve.
+   * @param {Character} characterStats - The global `Character` object. The plugin will map this to its internal representation of the character's stats.
+   *   (Note: The `Character` type is defined in `lib/schemas.ts` and includes properties like `name`, `gender`, `race`, `biography`, `locationIndex`.)
+   * @returns {string} A statement describing the check's result and any consequences.
+   */
+  resolveCheck?(check: CheckDefinition, characterStats: Character, context: WritableDraft<State>, action?: string): Promise<CheckResolutionResult>;
+
+  /**
+   * @method handleConsequence
+   * @description Applies state changes based on the outcome of a check or event.
+   * This method is called internally by `resolveCheck` and is solely responsible for modifying the plugin's internal state.
+   * @param {string} eventType - The type of event triggering the consequence (e.g., "damage_dealt", "status_effect_applied").
+   * @param {string[]} [checkResultStatements] - Optional: Statements describing results of checks that led to this consequence.
+   * @param {string} [action] - Optional: The action that triggered the consequence.
+   * @returns {void}
+   */
+  handleConsequence?(eventType: string, checkResultStatements?: string[], action?: string): void;
+  
+  /**
+   * @method getActions
+   * @description Provides a list of available actions based on the current game state and plot type.
+   * @returns {Promise<string[]>} A promise that resolves to an array of action strings.
+   */
+  getActions?(): Promise<string[]>;
+
+  /**
+   * @method getNarrativeGuidance
+   * @description Generates a narration prompt, influenced by the outcome of performed checks and consequences (e.g., HP, item, relationship, story/plot branch changes).
+   * @param {string} eventType - The type of event triggering narration.
+   * @param {WritableDraft<State>} context - The current game state. (Note: Direct mutation of this `WritableDraft` object is the intended way to update state.)
+   * @param {CheckResolutionResult[]} [checkResultStatements] - Optional: Statements describing results of checks performed for the event, provided by `resolveCheck`.
+   * @param {string} [action] - Optional: The action that triggered the narration.
+   * @returns {Promise<string[]>} The generated narration prompt.
+   */
+  getNarrativeGuidance?(eventType: string, context: WritableDraft<State>, checkResultStatements?: CheckResolutionResult[], action?: string): Promise<string[]>;
+
+}
+
+/**
  * @interface Plugin
  * @description Defines the partial interface for a plugin, including optional methods for initialization, backend retrieval, and location change handling.
  */
@@ -138,13 +285,17 @@ export type Plugin = Partial<{
   /**
    * @method init
    * @description Initializes the plugin with provided settings and context.
-   * The context is determined by the environment in which the plugin runs,
+   * The context is determined by the environment in which the environment in which the plugin runs,
    * e.g. a frontend that provides methods for adding custom components.
    * @param {Record<string, unknown>} settings - The settings for the plugin.
-   * @param {unknown} context - The context object provided by the environment.
+   * @param {Context} context - The context object provided by the environment.
+   * @param {IAppLibs} appLibs - Instance of AppLibs for library access.
+   * @param {IAppBackend} appBackend - Instance of AppBackend for backend communication.
+   * @param {IAppStateManager} appStateManager - Instance of AppStateManager for state management.
+   * @param {IAppUI} appUI - Instance of AppUI for UI interactions.
    * @returns {Promise<void>}
    */
-  init(settings: Record<string, unknown>, context: unknown): Promise<void>;
+  init(settings: Record<string, unknown>, context: Context, appLibs: IAppLibs, appBackend: IAppBackend, appStateManager: IAppStateManager, appUI: IAppUI): Promise<void>;
 
   /**
    * @method getBackends
@@ -161,6 +312,13 @@ export type Plugin = Partial<{
    * @returns {Promise<void>}
    */
   onLocationChange(newLocation: Location, state: WritableDraft<State>): Promise<void>;
+
+  /**
+   * @method getGameRuleLogic
+   * @description Retrieves the game rule logic implementation provided by the plugin.
+   * @returns {IGameRuleLogic} An instance of the game rule logic.
+   */
+  getGameRuleLogic?(): IGameRuleLogic;
 }>;
 
 /**
@@ -176,6 +334,7 @@ export interface PluginWrapper {
   enabled: boolean;
   settings: Record<string, unknown>;
   plugin: Plugin;
+  selectedPlugin?: boolean;
 }
 
 /**

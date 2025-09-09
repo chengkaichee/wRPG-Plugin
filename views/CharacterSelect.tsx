@@ -1,26 +1,37 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2025  Philipp Emanuel Weidmann <pew@worldwidemann.com>
 
-import { Box, RadioCards, SegmentedControl, Text, Tabs } from "@radix-ui/themes"; // Added Box and Tabs for layout and tab functionality
+import * as React from "react"; // Import React
+import { Box, RadioCards, SegmentedControl, Text, Tabs, Switch, Flex } from "@radix-ui/themes"; // Added Switch and Flex
 import { GiFemale, GiMale } from "react-icons/gi";
 import { useShallow } from "zustand/shallow";
 import ImageOption from "@/components/ImageOption";
-import { usePluginsStateStore } from "@/app/plugins";
+import { usePluginsStateStore, Context } from "@/app/plugins"; // Import Context
+import { getBackend } from "@/lib/backend";
 import WizardStep from "@/components/WizardStep";
 import { type Gender, type Race, useStateStore } from "@/lib/state";
+import type { IAppLibs } from "@/app/services/AppLibs";
+import type { IAppBackend } from "@/app/services/AppBackend";
+import type { IAppStateManager } from "@/app/services/AppStateManager";
+import type { IAppUI } from "@/app/services/AppUI";
 
 /**
  * CharacterSelect component for selecting protagonist gender, race, and character generation plugin UI
  * This component allows users to customize their character's appearance and attributes
  * before starting a new game. It integrates with plugin like manage and persist D&D-specific settings.
  */
-export default function CharacterSelect({ onNext, onBack }: { onNext?: () => void; onBack?: () => void }) {
+export default function CharacterSelect({ onNext, onBack, appLibs, appBackend, appStateManager, appUI }: { onNext?: () => void; onBack?: () => void; appLibs: IAppLibs; appBackend: IAppBackend; appStateManager: IAppStateManager; appUI: IAppUI; }) {
+  // Introduce local state for tab management
+  const [activeTabKey, setActiveTabKey] = React.useState('default'); // 'default' for Appearance tab
+
   // Destructure gender, race, and setState from the Zustand state store.
-  const { gender, race, setState } = useStateStore(
+  const { gender, race, setState, plugins, protagonist } = useStateStore( // Removed activeGameRule
     useShallow((state) => ({
       gender: state.protagonist.gender,
       race: state.protagonist.race,
       setState: state.set,
+      plugins: state.plugins, // Get plugins from global state
+      protagonist: state.protagonist, // Get protagonist for ImageOption
     })),
   );
 
@@ -30,26 +41,57 @@ export default function CharacterSelect({ onNext, onBack }: { onNext?: () => voi
     })),
   );
 
+  const handlePluginSelectionToggle = (pluginName: string, isSelected: boolean) => {
+    appStateManager.setPluginSelected(pluginName, isSelected);
+  };
+  // Find all currently selected plugins' names for display
+  const currentlySelectedPlugins = plugins.filter(p => p.selectedPlugin);
+  const activeGameRuleDisplay = currentlySelectedPlugins.length > 0
+    ? currentlySelectedPlugins.map(p => p.name).join(", ")
+    : "Default";
+
   return (
     <WizardStep title="Character" onNext={onNext} onBack={onBack}>
+      <Flex direction="column" gap="4" mb="4">
+        <Text size="6">Active Game Rule: {activeGameRuleDisplay}</Text>
+      </Flex>
+
       {/* Tabs for Character Appearance and Rules plugin */}
-      <Tabs.Root defaultValue="appearance">
+      <Tabs.Root value={activeTabKey} onValueChange={setActiveTabKey}>
         <Tabs.List>
-          <Tabs.Trigger value="appearance">
+          <Tabs.Trigger value="default">
             <Text size="6">Appearance</Text>
           </Tabs.Trigger>
-              {characterUIs.map((characterUI) => (
-                <Tabs.Trigger key={characterUI.GameRuleName} value={characterUI.GameRuleName}>
-                  <Text size="6">{characterUI.GameRuleTab}</Text>
-                </Tabs.Trigger>
-              ))}          
+          {characterUIs.map((characterUI) => {
+            const plugin = plugins.find(p => p.name === characterUI.GameRuleName);
+            const isSelected = plugin?.selectedPlugin || false;
+            return (
+              <Tabs.Trigger key={characterUI.GameRuleName} value={characterUI.GameRuleName}>
+                <Flex align="center" gap="2">
+                  {/* Removed redundant <Text size="6"> wrapper */}
+                  {characterUI.GameRuleTab}
+                  {isSelected && (
+                    <Box
+                      style={{
+                        width: '10px',
+                        height: '10px',
+                        borderRadius: '50%',
+                        backgroundColor: 'red',
+                        boxShadow: '0 0 5px red',
+                      }}
+                    />
+                  )}
+                </Flex>
+              </Tabs.Trigger>
+            );
+          })}
         </Tabs.List>
 
         <Box mt="5">
           {/* Content for Appearance Tab */}
-          <Tabs.Content value="appearance">
+          <Tabs.Content value="default">
             {/* SegmentedControl for Gender Selection */}
-            <SegmentedControl.Root
+          <SegmentedControl.Root
               value={gender}
               onValueChange={(value: Gender) =>
                 setState((state) => {
@@ -85,11 +127,24 @@ export default function CharacterSelect({ onNext, onBack }: { onNext?: () => voi
             </RadioCards.Root>
           </Tabs.Content>
 
-          {characterUIs.map((characterUI) => (
-            <Tabs.Content key={characterUI.GameRuleName} value={characterUI.GameRuleName}>
-              {characterUI.GameRulePage}
-            </Tabs.Content>
-          ))}
+          {characterUIs.map((characterUI) => {
+            const plugin = plugins.find(p => p.name === characterUI.GameRuleName);
+            const isSelected = plugin?.selectedPlugin || false;
+            return (
+              <Tabs.Content key={characterUI.GameRuleName} value={characterUI.GameRuleName}>
+                <Flex direction="column" gap="4" mb="4">
+                  <Flex align="center" gap="2">
+                    <Text size="4">Enable this plugin's game rule logic:</Text>
+                    <Switch
+                      checked={isSelected}
+                      onCheckedChange={(checked) => handlePluginSelectionToggle(characterUI.GameRuleName, checked)}
+                    />
+                  </Flex>
+                  {characterUI.GameRulePage}
+                </Flex>
+              </Tabs.Content>
+            );
+          })}
         </Box>
       </Tabs.Root>
     </WizardStep>

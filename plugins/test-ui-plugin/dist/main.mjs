@@ -44,7 +44,7 @@ var TestUIAttributeDisplay = ({ initialAttributeValue, injectedReact, injectedRa
     }
   ), /* @__PURE__ */ React.createElement(injectedRadixThemes.Button, { onClick: handleApply }, "Apply"), /* @__PURE__ */ React.createElement(injectedRadixThemes.Text, null, " (Persisted: ", displayValue, ")"));
 };
-var PluginCharacterUIPage = ({ injectedReact, injectedImmer, injectedRadixThemes, injectedReactIconsGi, getGlobalState, setGlobalState, onSave, injectedUseShallow }) => {
+var PluginCharacterUIPage = ({ injectedReact, injectedImmer, injectedRadixThemes, injectedReactIconsGi, getGlobalState, onSave, injectedUseShallow }) => {
   const pluginSettings = injectedReact.useMemo(() => {
     const state = getGlobalState();
     const plugin = state.plugins.find((p) => p.name === "test-ui-plugin");
@@ -62,7 +62,6 @@ var PluginCharacterUIPage = ({ injectedReact, injectedImmer, injectedRadixThemes
   );
 };
 var TestUIPlugin = class {
-  // Internal copy of plugin settings.
   /**
    * @method init
    * @description Initializes the plugin. This method is called by the main application
@@ -71,32 +70,29 @@ var TestUIPlugin = class {
    * @param {Context} context - The Context object providing access to main application functionalities.
    * @returns {Promise<void>}
    */
-  async init(settings, context) {
+  async init(settings, context, appLibs, appBackend, appStateManager, appUI) {
     this.context = context;
+    this.appBackend = appBackend;
+    this.appStateManager = appStateManager;
+    this.appUI = appUI;
     this.settings = settings;
-    React = this.context.react;
+    React = appLibs.react;
     this.context.addCharacterUI(
-      "Test UI",
+      this.context.pluginName,
       // GameRuleName: Display name for the UI tab.
       /* @__PURE__ */ React.createElement("span", null, "Test UI Tab"),
       // GameRuleTab: The ReactNode for the tab trigger.
       /* @__PURE__ */ React.createElement(
         PluginCharacterUIPage,
         {
-          injectedReact: this.context.react,
-          injectedImmer: this.context.immer,
-          injectedRadixThemes: this.context.radixThemes,
-          injectedReactIconsGi: this.context.reactIconsGi,
-          injectedUseShallow: this.context.useShallow,
-          getGlobalState: this.context.getGlobalState,
-          setGlobalState: this.context.setGlobalState,
+          injectedReact: appLibs.react,
+          injectedImmer: appLibs.immer,
+          injectedRadixThemes: appLibs.radixThemes,
+          injectedReactIconsGi: appLibs.reactIconsGi,
+          injectedUseShallow: appLibs.useShallow,
+          getGlobalState: this.appStateManager.getGlobalState,
           onSave: async (newValue) => {
-            this.context.setGlobalState(async (state) => {
-              const plugin = state.plugins.find((p) => p.name === "test-ui-plugin");
-              if (plugin) {
-                plugin.settings = __spreadProps(__spreadValues({}, plugin.settings), { customAttribute: newValue });
-              }
-            });
+            this.appStateManager.savePluginSettings(this.context.pluginName, { customAttribute: newValue });
             this.settings = __spreadProps(__spreadValues({}, this.settings), { customAttribute: newValue });
           }
         }

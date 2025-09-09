@@ -12,6 +12,7 @@ import MainMenu from "@/components/MainMenu";
 import ProcessingOverlay from "@/components/ProcessingOverlay";
 import StateDebugger from "@/components/StateDebugger";
 import { abort, back, isAbortError, next } from "@/lib/engine";
+import { getBackend } from "@/lib/backend";
 import { type Plugin, type PluginWrapper, useStateStore } from "@/lib/state";
 import CharacterSelect from "@/views/CharacterSelect";
 import Chat from "@/views/Chat";
@@ -21,10 +22,11 @@ import ScenarioSetup from "@/views/ScenarioSetup";
 import Welcome from "@/views/Welcome";
 import { Context } from "./plugins";
 import type { Manifest } from "./plugins/route";
-
-
+import { AppLibs } from "./services/AppLibs";
+import { AppBackend } from "./services/AppBackend";
+import { AppStateManager } from "./services/AppStateManager";
+import { AppUI } from "./services/AppUI";
 import * as Immer from 'immer';
-import * as Lodash from 'lodash';
 import * as RadixThemes from '@radix-ui/themes';
 import * as ReactIconsGi from 'react-icons/gi';
 import * as rpgDiceRoller from '@dice-roller/rpg-dice-roller';
@@ -32,6 +34,40 @@ import * as rpgDiceRoller from '@dice-roller/rpg-dice-roller';
 export default function Home() {
   const [stateLoaded, setStateLoaded] = useState(false);
   const [pluginsLoaded, setPluginsLoaded] = useState(false);
+
+  // Instantiate granular services
+  const appLibs = new AppLibs(
+    React,
+    Immer,
+    RadixThemes,
+    ReactIconsGi,
+    useShallow,
+    rpgDiceRoller,
+  );
+
+  const appBackend = new AppBackend(getBackend);
+
+  const appStateManager = new AppStateManager(
+    useStateStore.getState,
+    useStateStore.getState().setAsync,
+    useStateStore.setState,
+  );
+
+  const appUI = new AppUI(
+    (title, message, tokenCount, visible = true) => {
+      setOverlayVisible(visible);
+      setOverlayTitle(title);
+      setOverlayMessage(message);
+      setOverlayTokenCount(tokenCount);
+      setOnOverlayCancel(() => abort);
+    },
+    (errorMessage, onRetry, onCancel) => {
+      setErrorMessage(errorMessage);
+      setOnErrorRetry(() => onRetry);
+      setOnErrorCancel(() => onCancel);
+    },
+    console.log, // Default log function
+  );
 
   const [overlayVisible, setOverlayVisible] = useState(true);
   const [overlayTitle, setOverlayTitle] = useState("Loading");
@@ -86,8 +122,17 @@ export default function Home() {
           const plugin: Plugin = new pluginClass();
 
           if (plugin.init) {
-            const context = new Context(manifest.name, React, useStateStore.getState().setAsync, useStateStore.getState, Immer, RadixThemes, ReactIconsGi, useShallow, rpgDiceRoller);
-            await plugin.init(pluginWrapper ? current(pluginWrapper.settings) : manifest.settings, context);
+            const context = new Context(
+              manifest.name,              
+            );
+            await plugin.init(
+              pluginWrapper ? current(pluginWrapper.settings) : manifest.settings,
+              context,
+              appLibs,
+              appBackend,
+              appStateManager,
+              appUI
+            );
           }
 
           if (plugin.getBackends) {
@@ -111,6 +156,7 @@ export default function Home() {
       });
 
       setPluginsLoaded(true);
+      //console.log("DEBUG: PAGE: Plugins loaded. Current state.plugins:", useStateStore.getState().plugins);
     } catch (error) {
       let message = error instanceof Error ? error.message : String(error);
       if (!message) {
@@ -129,8 +175,8 @@ export default function Home() {
 
   const nextView = async () => {
     try {
-      await next(undefined, (title, message, tokenCount) => {
-        setOverlayVisible(true);
+      await next(undefined, (title, message, tokenCount, visible = true) => {
+        setOverlayVisible(visible);
         setOverlayTitle(title);
         setOverlayMessage(message);
         setOverlayTokenCount(tokenCount);
@@ -180,7 +226,7 @@ export default function Home() {
           {view === "welcome" && <Welcome onNext={nextView} />}
           {view === "connection" && <ConnectionSetup onNext={nextView} onBack={back} />}
           {view === "genre" && <GenreSelect onNext={nextView} onBack={back} />}
-          {view === "character" && <CharacterSelect onNext={nextView} onBack={back} />}
+          {view === "character" && <CharacterSelect onNext={nextView} onBack={back} appLibs={appLibs} appBackend={appBackend} appStateManager={appStateManager} appUI={appUI} />}
           {view === "scenario" && <ScenarioSetup onNext={nextView} onBack={back} />}
           {view === "chat" && <Chat />}
 

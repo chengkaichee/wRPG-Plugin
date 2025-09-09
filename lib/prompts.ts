@@ -3,6 +3,7 @@
 
 import * as schemas from "./schemas";
 import type { State } from "./state";
+import { getActiveGameRuleLogic } from "./engine";
 
 /**
  * @interface Prompt
@@ -61,14 +62,16 @@ The world is populated by humans, elves, and dwarves.
  * @param {State} state - The current game state, containing world and protagonist gender/race.
  * @returns {Prompt} A Prompt object for protagonist generation.
  */
-export function generateProtagonistPrompt(state: State): Prompt {
+export function generateProtagonistPrompt(state: State, initialProtagonistStats: string): Prompt {
   return makePrompt(`
 Create a ${state.protagonist.gender} ${state.protagonist.race} protagonist
 for a fantasy adventure set in the world of ${state.world.name}.
 
 ${state.world.description}
 
-Return the character description as a JSON object. Include a short biography (100 words maximum).
+${initialProtagonistStats}
+
+Return the character description as a JSON object. Include a short biography (250 words maximum).
 `);
 }
 
@@ -185,10 +188,11 @@ ${normalize(prompt)}
  * @param {string} [action] - The action the protagonist has just taken, if any.
  * @returns {Prompt} A prompt for the LLM to generate narration.
  */
-export function narratePrompt(state: State, action?: string): Prompt {
+export function narratePrompt(state: State, action?: string, checkResultStatements?: string[]): Prompt {
+  const checkResultsText = checkResultStatements && checkResultStatements.length > 0 ? `\n\nCheck Results:\n${checkResultStatements.join('\n')}` : '';
   return makeMainPrompt(
     `
-${action ? `The protagonist (${state.protagonist.name}) has chosen to do the following: ${action}.` : ""}
+${action ? `The protagonist (${state.protagonist.name}) has chosen to do the following: ${action}.` : ""}${checkResultsText}
 Narrate what happens next, using novel-style prose, in the present tense.
 Prioritize dialogue over descriptions.
 Do not mention more than 2 different characters in your narration.
@@ -211,9 +215,20 @@ Do not explicitly ask the protagonist for a response at the end; they already kn
  * @param {State} state - The current game state.
  * @returns {Prompt} A prompt for the LLM to generate action options.
  */
-export function generateActionsPrompt(state: State): Prompt {
+export async function generateActionsPrompt(state: State): Promise<Prompt> {
+  const gameRuleLogic = getActiveGameRuleLogic();
+  let gameRuleActionsText = "";
+
+  if (gameRuleLogic.getActions) {
+    const actions = await gameRuleLogic.getActions();
+    gameRuleActionsText = `
+Here are the available actions from the game rule logic:
+${actions.map((a: string) => `- ${a}`).join('\n')}
+`;
+  }
+
   return makeMainPrompt(
-    `
+    `${gameRuleActionsText}
 Suggest 3 options for what the protagonist (${state.protagonist.name}) could do or say next.
 Each option should be a single, short sentence that starts with a verb.
 Return the options as a JSON array of strings.

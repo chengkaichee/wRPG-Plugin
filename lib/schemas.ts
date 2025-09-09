@@ -169,7 +169,7 @@ export const State = z.object({
   updateInterval: z.int(),
   logPrompts: z.boolean(),
   logParams: z.boolean(),
-  logResponses: z.boolean(),
+  logResponses: z.boolean(),  
   view: View,
   world: World,
   locations: Location.array(),

@@ -3,11 +3,10 @@
 
 import type { WritableDraft } from "immer";
 import type React from "react";
-import type { StoredState } from "@/lib/state";
+
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
 import { getState } from "@/lib/state";
-import { useStateStore } from "@/lib/state";
 
 /**
  * @interface BackendUI
@@ -86,35 +85,10 @@ export function getPluginsState(): PluginsState {
  */
 export class Context {
   pluginName: string;
-  react: typeof React;
-  setGlobalState: (updater: (state: WritableDraft<StoredState>) => Promise<void>) => Promise<void>;
-  getGlobalState: () => StoredState;
-  immer: typeof import('immer');
-  radixThemes: typeof import('@radix-ui/themes');
-  reactIconsGi: typeof import('react-icons/gi');
-  useShallow: typeof import('zustand/shallow').useShallow;
-  rpgDiceRoller: typeof import('@dice-roller/rpg-dice-roller');
-
   constructor(
     pluginName: string,
-    react: typeof React,
-    setGlobalState: (updater: (state: WritableDraft<StoredState>) => Promise<void>) => Promise<void>,
-    getGlobalState: () => StoredState,
-    immer: typeof import('immer'),
-    radixThemes: typeof import('@radix-ui/themes'),
-    reactIconsGi: typeof import('react-icons/gi'),
-    useShallow: typeof import('zustand/shallow').useShallow,
-    rpgDiceRoller: typeof import('@dice-roller/rpg-dice-roller'),
   ) {
     this.pluginName = pluginName;
-    this.react = react;
-    this.setGlobalState = setGlobalState;
-    this.getGlobalState = getGlobalState;
-    this.immer = immer;
-    this.radixThemes = radixThemes;
-    this.reactIconsGi = reactIconsGi;
-    this.useShallow = useShallow;
-    this.rpgDiceRoller = rpgDiceRoller;
   }
 
   /**

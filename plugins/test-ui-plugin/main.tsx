@@ -10,7 +10,7 @@
  * Key concepts demonstrated:
  * - Plugin initialization and Context object usage.
  * - Direct injection of shared React and UI libraries to avoid "two instances" problems.
- * - Accessing and updating the main application's global state using `setGlobalState` and `getGlobalState`.
+ * - Accessing and updating the main application's global state using `savePluginSettings` and `getGlobalState`.
  * - Persisting plugin-specific settings within the global state.
  * - Dynamic UI injection into predefined slots in the main application.
  *
@@ -28,6 +28,10 @@ import type * as RadixThemes from '@radix-ui/themes';
 import type * as ReactIconsGi from 'react-icons/gi';
 import type { ChangeEvent } from 'react';
 import type { useShallow } from 'zustand/shallow';
+import type { IAppLibs } from "@/app/services/AppLibs";
+import type { IAppBackend } from "@/app/services/AppBackend";
+import type { IAppStateManager } from "@/app/services/AppStateManager";
+import type { IAppUI } from "@/app/services/AppUI";
 
 // Declare a module-level React variable.
 // This variable will be assigned the main application's React instance during plugin initialization.
@@ -104,17 +108,15 @@ const TestUIAttributeDisplay = ({ initialAttributeValue, injectedReact, injected
  * @param {typeof RadixThemes} injectedRadixThemes - The main application's Radix Themes instance.
  * @param {typeof ReactIconsGi} injectedReactIconsGi - The main application's React Icons (Gi) instance.
  * @param {() => StoredState} getGlobalState - Function to retrieve the current global application state.
- * @param {(updater: (state: WritableDraft<StoredState>) => Promise<void>) => Promise<void>} setGlobalState - Function to asynchronously update the global application state.
  * @param {(newValue: string) => Promise<void>} onSave - Callback to propagate saved changes (used by child component). This callback is expected to handle asynchronous persistence of the new value.
  * @param {typeof useShallow} injectedUseShallow - The main application's `zustand/shallow`'s `useShallow` utility.
  */
-const PluginCharacterUIPage = ({ injectedReact, injectedImmer, injectedRadixThemes, injectedReactIconsGi, getGlobalState, setGlobalState, onSave, injectedUseShallow }: {
+const PluginCharacterUIPage = ({ injectedReact, injectedImmer, injectedRadixThemes, injectedReactIconsGi, getGlobalState, onSave, injectedUseShallow }: {
   injectedReact: typeof React;
   injectedImmer: typeof Immer;
   injectedRadixThemes: typeof RadixThemes;
   injectedReactIconsGi: typeof ReactIconsGi;
   getGlobalState: () => StoredState;
-  setGlobalState: (updater: (state: WritableDraft<StoredState>) => Promise<void>) => Promise<void>;
   onSave: (newValue: string) => Promise<void>;
   injectedUseShallow: typeof useShallow;
 }) => {
@@ -175,6 +177,10 @@ const PluginCharacterUIPage = ({ injectedReact, injectedImmer, injectedRadixThem
 export default class TestUIPlugin implements Plugin {
   private context: Context | undefined; // The Context object provided by the main application.
   private settings: Record<string, unknown> | undefined; // Internal copy of plugin settings.
+  private appLibs: IAppLibs | undefined;
+  private appBackend: IAppBackend | undefined;
+  private appStateManager: IAppStateManager | undefined;
+  private appUI: IAppUI | undefined;  
 
   /**
    * @method init
@@ -184,40 +190,37 @@ export default class TestUIPlugin implements Plugin {
    * @param {Context} context - The Context object providing access to main application functionalities.
    * @returns {Promise<void>}
    */
-  async init(settings: Record<string, unknown>, context: Context): Promise<void> {
+  async init(settings: Record<string, unknown>, context: Context, appLibs: IAppLibs, appBackend: IAppBackend, appStateManager: IAppStateManager, appUI: IAppUI): Promise<void> {
     this.context = context;
+    this.appBackend = appBackend;
+    this.appStateManager = appStateManager;
+    this.appUI = appUI;    
     this.settings = settings;
 
     // Assign the main application's React instance to the module-level React variable.
     // This is critical for all JSX within this plugin to use the correct React instance.
-    React = this.context.react;
+    React = appLibs.react;
 
     // Register the plugin's UI component with the main application.
     // The PluginCharacterUIPage component is passed as a ReactNode, along with
     // necessary injected libraries and global state access functions as props.
     this.context.addCharacterUI(
-      "Test UI", // GameRuleName: Display name for the UI tab.
+      this.context.pluginName, // GameRuleName: Display name for the UI tab.
       <span>Test UI Tab</span>, // GameRuleTab: The ReactNode for the tab trigger.
       <PluginCharacterUIPage
         // Pass injected shared libraries as props to the UI component.
-        injectedReact={this.context.react}
-        injectedImmer={this.context.immer}
-        injectedRadixThemes={this.context.radixThemes}
-        injectedReactIconsGi={this.context.reactIconsGi}
-        injectedUseShallow={this.context.useShallow}
+        injectedReact={appLibs.react}
+        injectedImmer={appLibs.immer}
+        injectedRadixThemes={appLibs.radixThemes}
+        injectedReactIconsGi={appLibs.reactIconsGi}
+        injectedUseShallow={appLibs.useShallow}
         // Pass global state access functions as props.
-        getGlobalState={this.context.getGlobalState}
-        setGlobalState={this.context.setGlobalState}
+        getGlobalState={this.appStateManager!.getGlobalState}
         // Define the onSave callback for the UI component.
         // This callback is responsible for updating the plugin's settings in the global state.
         onSave={async (newValue) => {
           /**
            * @description Updates the plugin's settings in the global state.
-           * This function is asynchronous because `setGlobalState` itself is asynchronous,
-           * wrapping `useStateStore.setAsync` from the main application.
-           *
-           * **Why `async` for the updater function?**
-           * The `setGlobalState` function expects its updater callback to return a `Promise<void>`.
            * By marking the updater function `async`, it implicitly returns a Promise, satisfying
            * this type requirement and ensuring proper asynchronous flow control.
            * This prevents type errors that would occur if a synchronous function (returning `void`)
@@ -228,14 +231,7 @@ export default class TestUIPlugin implements Plugin {
            *
            * @param {WritableDraft<StoredState>} state - The Immer draft of the global state.
            */
-          await this.context!.setGlobalState(async (state) => {
-            // Find the current plugin's entry in the global state's plugins array.
-            const plugin = state.plugins.find((p: PluginWrapper) => p.name === "test-ui-plugin");
-            if (plugin) {
-              // Directly modify the plugin's settings within the Immer draft.
-              plugin.settings = { ...plugin.settings, customAttribute: newValue };
-            }
-          });
+          this.appStateManager!.savePluginSettings(this.context!.pluginName, { customAttribute: newValue });
           // Also update the plugin's internal settings for immediate consistency.
           this.settings = { ...this.settings, customAttribute: newValue };
         }}

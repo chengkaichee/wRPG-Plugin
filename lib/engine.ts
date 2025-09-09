@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2025  Philipp Emanuel Weidmann <pew@worldwidemann.com>
 
-import { current } from "immer";
+import { current, WritableDraft } from "immer";
 import { throttle } from "lodash";
 import * as z from "zod/v4";
 import { getBackend } from "./backend";
@@ -18,10 +18,67 @@ import {
   type Prompt,
 } from "./prompts";
 import * as schemas from "./schemas";
-import { getState, initialState, type Location, type LocationChangeEvent, type NarrationEvent } from "./state";
-//Test-plugin helper function use
-//import { WritableDraft } from "immer";
-//import { StoredState } from "./state";
+import { getState, initialState, type Location, type LocationChangeEvent, type NarrationEvent, type IGameRuleLogic, StoredState, type CheckDefinition, type Character, type State, type CheckResolutionResult } from "./state";
+
+/**
+ * @function getDefaultGameRuleLogic
+ * @description Provides a default implementation of the IGameRuleLogic interface.
+ * @returns {IGameRuleLogic} The default game rule logic.
+ */
+function getDefaultGameRuleLogic(): IGameRuleLogic {
+  return {
+    // Default implementation for getBiographyGuidance
+    getBiographyGuidance: () => "",
+
+    // Default implementation for modifyProtagonistPrompt
+    modifyProtagonistPrompt: (originalPrompt: Prompt) => originalPrompt,
+
+    // Default implementation for getAvailableRaces
+    getAvailableRaces: () => [],
+
+    // Default implementation for getAvailableClasses
+    getAvailableClasses: () => [],
+
+    // Default implementation for getActionChecks
+    getActionChecks: () => Promise.resolve([]),
+
+    // Default implementation for resolveCheck
+    resolveCheck: async (_check: CheckDefinition, _characterStats: Character, _context: WritableDraft<State>, _action?: string) => {
+      return { resultStatement: "", consequencesApplied: [] };
+    },
+
+    // Default implementation for getActions
+    getActions: () => Promise.resolve([]),
+
+    // Default implementation for getNarrativeGuidance
+    getNarrativeGuidance: async (eventType: string, context: WritableDraft<StoredState>, checkResolutionResults?: CheckResolutionResult[], action?: string) => {
+      // Call the comprehensive narratePrompt from lib/prompts.ts
+      const prompt = narratePrompt(context, action, checkResolutionResults?.map(cr => cr.resultStatement));
+      return [prompt.user]; // Return the user part of the prompt as a string array
+    },
+  };
+}
+
+/**
+ * @function getActiveGameRuleLogic
+ * @description Retrieves the currently active IGameRuleLogic implementation.
+ * @returns {IGameRuleLogic} The active game rule logic.
+ */
+export function getActiveGameRuleLogic(): IGameRuleLogic {
+  const state = getState();
+
+  // Check if any plugin is explicitly selected via the 'selectedPlugin' flag.
+  for (const pluginWrapper of state.plugins) {
+    if (pluginWrapper.enabled && pluginWrapper.selectedPlugin && pluginWrapper.plugin?.getGameRuleLogic) {
+      console.log(`DEBUG: ENGINE: Using game rule logic from explicitly selected plugin: ${pluginWrapper.name}`);
+      return pluginWrapper.plugin.getGameRuleLogic();
+    }
+  }
+
+  console.log("DEBUG: ENGINE: Using default game rule logic.");
+  // If no matching plugin is found, return the default logic
+  return getDefaultGameRuleLogic();
+}
 
 /**
  * @constant RawCharacter
@@ -70,15 +127,6 @@ export async function next(
     // by the `onProgress` callback to inform the user about the ongoing operation.
     let step: [string, string];
 
-    /* Helper function to get tstCount for logging
-    *const getTstCount = (currentState: WritableDraft<StoredState>) => {
-    *  const testPlugin = currentState.plugins.find(p => p.name === "test-plugin");
-    *  return testPlugin?.settings?.tstCount as number | undefined;
-    *};
-    */
-
-    //console.log("ENGINE: next() - Start of setAsync. Initial tstCount:", getTstCount(state));
-
     /**
      * @constant onToken
      * @description Throttled callback for updating progress indicators during token streaming.
@@ -117,7 +165,6 @@ export async function next(
         // This snapshot is then used to update the global Zustand store.
         // This ensures that UI components subscribed to the state receive the latest updates.
         getState().set(current(state));
-        //console.log("ENGINE: updateState() - Committing state. tstCount:", getTstCount(state));
       },
       // The throttling interval is determined by `state.updateInterval`,
       // preventing excessive state updates during rapid changes.
@@ -160,6 +207,9 @@ export async function next(
      * @returns {Promise<void>} A promise that resolves when narration generation and processing is complete.
      */
     const narrate = async (action?: string) => {
+      const gameRuleLogic = getActiveGameRuleLogic();
+      let checkResolutionResults: CheckResolutionResult[] = []; // This needs to be populated *before* narrationPromptContent
+
       // Initialize a new NarrationEvent object. This object will store the generated
       // narration text and associated metadata.
       const event: NarrationEvent = {
@@ -172,11 +222,64 @@ export async function next(
       // Add the newly created narration event to the global list of events in the state.
       state.events.push(event);
 
+      // --- NEW LOGIC FOR GATHERING AND RESOLVING CHECKS ---
+      let checkDefinitions: CheckDefinition[] = [];
+
+      // 1. Get checks from narration (new logic)
+      // This block will execute if the gameRuleLogic has an getActionChecks method.
+      // It will process the scene narration (from the *previous* event, or initial state) to identify any checks.
+      // We need to get the *most recent* narration event text for this.
+      let sceneNarrationForChecks = "";
+      for (let i = state.events.length - 1; i >= 0; i--) {
+        const prevEvent = state.events[i];
+        if (prevEvent.type === "narration") {
+          sceneNarrationForChecks = prevEvent.text;
+          break;
+        }
+      }
+
+      if (sceneNarrationForChecks && gameRuleLogic.getActionChecks) {
+        console.log(`DEBUG: ENGINE: getActionChecks called with narration only: ${sceneNarrationForChecks}`);
+        const narrationChecks = await gameRuleLogic.getActionChecks(sceneNarrationForChecks, state);
+        checkDefinitions.push(...narrationChecks);
+      }
+
+      // 2. Get checks from user action (existing logic, now combined)
+      if (action && gameRuleLogic.getActionChecks) {
+        console.log(`DEBUG: ENGINE: getActionChecks called with action: ${action}`);
+        const actionChecks = await gameRuleLogic.getActionChecks(action, state);
+        checkDefinitions.push(...actionChecks);
+      }
+
+      // Process all collected checks (from both narration and user action)
+      for (const check of checkDefinitions) {
+        if (gameRuleLogic.resolveCheck) {
+          console.log(`DEBUG: ENGINE: resolveCheck called with check: ${JSON.stringify(check)}`);
+          const resultStatement = await gameRuleLogic.resolveCheck(check, state.protagonist, state, action);
+          console.log(`DEBUG: ENGINE: resolveCheck returned: ${JSON.stringify(resultStatement)}`);
+          checkResolutionResults.push(resultStatement); // This populates checkResolutionResults
+        }
+      }
+      // --- END NEW LOGIC ---
+
       // Update the `step` variable to indicate that narration is in progress.
       step = ["Narrating", ""];
       // Request narration text from the backend. The `getNarration` method streams
       // tokens, and the callback updates the `event.text` and triggers UI updates.
-      event.text = await backend.getNarration(narratePrompt(state, action), (token: string, count: number) => {
+      let narrationPromptContent: Prompt;
+      if (gameRuleLogic.getNarrativeGuidance) {
+        console.log(`DEBUG: ENGINE: getNarrativeGuidance called.`);
+        // Now checkResolutionResults is populated from the *current* action/narration processing
+        const consequences = await gameRuleLogic.getNarrativeGuidance("general", state, checkResolutionResults, action);
+        narrationPromptContent = narratePrompt(state, action, consequences);
+        console.log(`DEBUG: ENGINE: using Narration Guidance from plugin. `); //debug logging - ${JSON.stringify(narrationPromptContent)}
+      } else {
+        console.log(`DEBUG: ENGINE: Falling back to narratePrompt from lib/prompts.ts.`);
+        narrationPromptContent = narratePrompt(state, action);
+        console.log(`DEBUG: ENGINE: narratePrompt (fallback) returned: `); //debug logging - ${JSON.stringify(narrationPromptContent)}
+      }
+
+      event.text = await backend.getNarration(narrationPromptContent, (token: string, count: number) => {
         // Append the received token to the narration text.
         event.text += token;
         // Call the throttled `onToken` function to update progress indicators.
@@ -270,7 +373,16 @@ export async function next(
         step = ["Generating protagonist", "This typically takes between 10 and 30 seconds"];
         // Request the backend to generate the protagonist character.
         // The generated character object is assigned to `state.protagonist`.
-        state.protagonist = await backend.getObject(generateProtagonistPrompt(state), RawCharacter, onToken);
+        const gameRuleLogic = getActiveGameRuleLogic();
+        const initialProtagonistStats = gameRuleLogic.getBiographyGuidance ? await gameRuleLogic.getBiographyGuidance() : "";
+        console.log(`DEBUG: ENGINE: using Biography Guidance from plugins`); //Debug logging - ${initialProtagonistStats}
+        let protagonistPrompt = generateProtagonistPrompt(state, initialProtagonistStats);
+        if (gameRuleLogic.modifyProtagonistPrompt) {
+          const originalPrompt = { ...protagonistPrompt }; // Capture original for logging
+          protagonistPrompt = gameRuleLogic.modifyProtagonistPrompt(protagonistPrompt);
+          console.log(`DEBUG: ENGINE: Using custom protagonist prompt from plugins`); //debug logging - system: ${protagonistPrompt.system}, user: ${protagonistPrompt.user}
+        }
+        state.protagonist = await backend.getObject(protagonistPrompt, RawCharacter, onToken);
         // Initialize the protagonist's location to the first location (index 0).
         state.protagonist.locationIndex = 0;
 
@@ -323,24 +435,19 @@ export async function next(
 
         // Clear any previous actions from the state.
         state.actions = [];
-        // Update the global state to reflect the cleared actions.
         updateState();
 
-        // If an `action` was provided (e.g., by the user in the chat input),
+        // If an `action` was provided (e.g., by the user in the chat input), add the user's action as a new event to the state.
         if (action) {
-          // Add the user's action as a new event to the state.
           state.events.push({
             type: "action",
             action,
           });
-          // Update the global state to reflect the new action event.
           updateState();
         }
 
-        // Generate and process narration based on the current state and user action.
+        // Generate narration processing the chosen action based on the current state and user action and check for location change.
         await narrate(action);
-
-        // Check if the location should change based on the current state.
         step = ["Checking for location change", "This typically takes a few seconds"];
         if (!(await getBoolean(checkIfSameLocationPrompt(state), onToken))) {
           // If the backend indicates a location change is needed, define the schema for the new location info.
@@ -354,11 +461,9 @@ export async function next(
           // Request the backend to generate the new location and accompanying characters.
           const newLocationInfo = await backend.getObject(generateNewLocationPrompt(state), schema, onToken);
 
-          // Trigger the `onLocationChange` hook for all plugins with the newly generated location.
-          //console.log("ENGINE: next() - Before subsequent onLocationChange. tstCount:", getTstCount(state));
+          // Trigger the `onLocationChange` hook for all plugins with the newly generated location.          
           await onLocationChange(newLocationInfo.newLocation);
-          //console.log("ENGINE: next() - After subsequent onLocationChange. tstCount:", getTstCount(state));
-
+          
           // Add the new location to the game's list of locations.
           state.locations.push(newLocationInfo.newLocation);
           // Get the index of the newly added location.
@@ -404,18 +509,14 @@ export async function next(
           for (let i = state.characters.length - characters.length; i < state.characters.length; i++) {
             event.presentCharacterIndices.push(i);
           }
-
-          //console.log("ENGINE: next() - Before narrate (subsequent). tstCount:", getTstCount(state));
           // Generate narration for the new location and characters.
           await narrate();
-          //console.log("ENGINE: next() - After narrate (subsequent). tstCount:", getTstCount(state));
         }
 
-        // Update `step` to indicate action generation.
+        // Update `step` to indicate action generation requesting the backend to generate a list of possible actions for the current state.
         step = ["Generating actions", "This typically takes a few seconds"];
-        // Request the backend to generate a list of possible actions for the current state.
         state.actions = await backend.getObject(
-          generateActionsPrompt(state),
+          await generateActionsPrompt(state),
           schemas.Action.array().length(3),
           onToken,
         );
@@ -482,6 +583,7 @@ export function reset(): void {
  * @returns {void}
  */
 export function abort(): void {
+  console.log("DEBUG: ENGINE: Abort function called.");
   getBackend().abort();
 }
 
