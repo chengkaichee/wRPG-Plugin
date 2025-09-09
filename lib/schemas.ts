@@ -143,6 +143,7 @@ export const LocationChangeEvent = z.object({
   type: z.literal("location_change"),
   locationIndex: Index,
   presentCharacterIndices: Index.array(),
+  summary: Text.max(5000).optional(),
 });
 
 /**
@@ -164,6 +165,8 @@ export const State = z.object({
   apiUrl: z.url(),
   apiKey: z.string().trim(),
   model: z.string().trim(),
+  contextLength: z.int(),
+  inputLength: z.int(),
   generationParams: RequestParams,
   narrationParams: RequestParams,
   updateInterval: z.int(),

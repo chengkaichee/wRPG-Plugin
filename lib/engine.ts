@@ -16,6 +16,7 @@ import {
   generateWorldPrompt,
   narratePrompt,
   type Prompt,
+  summarizeScenePrompt,
 } from "./prompts";
 import * as schemas from "./schemas";
 import { getState, initialState, type Location, type LocationChangeEvent, type NarrationEvent, type IGameRuleLogic, StoredState, type CheckDefinition, type Character, type State, type CheckResolutionResult } from "./state";
@@ -493,7 +494,14 @@ export async function next(
             presentCharacterIndices: accompanyingCharacterIndices,
           };
 
-          // Add the location change event to the state.
+          // summarize the previous scene (all events after the last location change)
+          step = ["Summarizing scene", "This typically takes between 10 and 30 seconds"];
+          event.summary = await backend.getNarration(summarizeScenePrompt(state), (token: string, count: number) => {
+            event.summary += token;
+            onToken(token, count);
+            updateState();
+          });
+
           state.events.push(event);
           // Update the global state to reflect the new event.
           updateState();

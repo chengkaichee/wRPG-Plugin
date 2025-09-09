@@ -1,6 +1,6 @@
-# Waidrin
+![Waidrin](/public/images/logo.png)
 
-Waidrin is a purpose-built role-playing game engine powered by an LLM.
+**Waidrin** is a purpose-built role-playing game engine powered by an LLM.
 It is designed around an asynchronous, fully typed, fully validating state machine
 that uses constrained generation based on JSON schemas to dynamically create
 locations and characters as the story progresses, and keep track of them.

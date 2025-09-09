@@ -101,6 +101,8 @@ export const initialState: State = schemas.State.parse({
   apiUrl: "http://localhost:5001/v1/",
   apiKey: "",
   model: "",
+  contextLength: 16384,
+  inputLength: 16384,
   generationParams: {
     temperature: 0.5,
   },

@@ -22,8 +22,10 @@ const cinzelDecorative = Cinzel_Decorative({
 export const metadata: Metadata = {
   title: "Waidrin",
   description: "Next-generation AI roleplay system",
-  // https://stackoverflow.com/a/38917888
-  icons: "data:,",
+  icons: {
+    icon: "/images/icon.png",
+    apple: "/images/icon.png",
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

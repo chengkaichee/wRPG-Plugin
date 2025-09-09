@@ -10,11 +10,12 @@ import WizardStep from "@/components/WizardStep";
 import { useStateStore } from "@/lib/state";
 
 export default function ConnectionSetup({ onNext, onBack }: { onNext?: () => void; onBack?: () => void }) {
-  const { apiUrl, apiKey, model, activeBackend, setState } = useStateStore(
+  const { apiUrl, apiKey, model, contextLength, activeBackend, setState } = useStateStore(
     useShallow((state) => ({
       apiUrl: state.apiUrl,
       apiKey: state.apiKey,
       model: state.model,
+      contextLength: state.contextLength,
       activeBackend: state.activeBackend,
       setState: state.set,
     })),
@@ -116,6 +117,36 @@ export default function ConnectionSetup({ onNext, onBack }: { onNext?: () => voi
                       className="mt-1 font-mono"
                       size="3"
                       placeholder="mistral-small3.2"
+                    />
+                  </Label.Root>
+                </Box>
+
+                <Box mb="5">
+                  <Label.Root>
+                    <Flex width="100%" justify="between" align="end">
+                      <Text size="6">Context length</Text>
+                      <Text size="4" color="gray">
+                        Check backend configuration or provider documentation for the correct value
+                      </Text>
+                    </Flex>
+                    <TextField.Root
+                      value={contextLength}
+                      onChange={(event) =>
+                        setState((state) => {
+                          state.contextLength = Number(event.target.value);
+                          if (Number.isNaN(state.contextLength)) {
+                            state.contextLength = 0;
+                          }
+
+                          // Some API providers have input limits that are substantially lower
+                          // than the context length. This is a pragmatic hack to address that
+                          // without having to add yet another potentially confusing UI input.
+                          state.inputLength = Math.min(state.contextLength, 250000);
+                        })
+                      }
+                      className="mt-1 font-mono"
+                      size="3"
+                      placeholder="16384"
                     />
                   </Label.Root>
                 </Box>
