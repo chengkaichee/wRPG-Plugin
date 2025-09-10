@@ -51,7 +51,7 @@ To better reflect its role and consolidate narration logic within the plugin, th
         ```typescript
         export interface CheckResolutionResult {
           resultStatement: string; // The factual outcome of the check (e.g., "You passed the check").
-          consequencesApplied?: string[]; // Optional: A list of high-level consequences applied (e.g., "Goblin 1 took 15 damage", "Goblin 1 is dead", "Longsword broke").
+          consequenceLog?: string[]; // Optional: A list of high-level consequences applied (e.g., "Goblin 1 took 15 damage", "Goblin 1 is dead", "Longsword broke").
         }
         ```
     *   Refine `resolveCheck` in `IGameRuleLogic` to return `Promise<CheckResolutionResult>` and accept `context: WritableDraft<State>` and `action?: string` as parameters.
@@ -540,3 +540,56 @@ The following mini-scenarios are proposed to cover common D&D combat situations 
 4.  **`plugins/game-rule-dnd5e/src/main.tsx` (`getNarrativeGuidance()`):**
     *   Checks `this.settings.plotType`. ("combat").
     *   Generates narration: "Goblin 1 lunges at you, its crude scimitar flashing! It strikes your arm, dealing 7 piercing damage. The blow sends you reeling, and darkness consumes your vision as you collapse to the ground, unconscious."
+
+### Current Implementation Status
+
+Based on the analysis of the codebase, here's a summary of the completed and remaining tasks:
+
+#### Completed Parts (as per `Combat mechanics change request.md` and current codebase)
+
+*   **Core Principle and Design Rationale:** The `plotType` and `encounter` design is implemented in `src/pluginData.ts` and `src/main.tsx`. The core application (`lib/`) does not rely on a global `isCombat` flag.
+*   **`lib/state.ts`:**
+    *   `isCombat` has been removed from `State` schema and `initialState`.
+    *   `IGameRuleLogic` interface includes `getNarrativeGuidance`, `resolveCheck`, `handleConsequence`, and `getActions` with their specified signatures.
+    *   `CheckResolutionResult` interface is defined.
+*   **`lib/engine.ts`:**
+    *   `getDefaultGameRuleLogic()` provides default implementations for all `IGameRuleLogic` methods, including `resolveCheck` returning `consequencesApplied`.
+    *   `getActiveGameRuleLogic()` correctly retrieves plugin logic.
+    *   The `narrate()` function correctly calls `getActionChecks`, `resolveCheck`, and `getNarrativeGuidance` in the specified order, passing `CheckResolutionResult[]` to `getNarrativeGuidance`.
+    *   The `next()` function correctly uses `getBiographyGuidance` and `modifyProtagonistPrompt`.
+    *   No `state.isCombat` checks or calls to `getCombatRoundNarration()` are present.
+*   **`lib/prompts.ts`:**
+    *   `narratePrompt` accepts `checkResultStatements?: string[]`.
+    *   `generateActionsPrompt` correctly calls `gameRuleLogic.getActions()` if available.
+*   **`plugins/game-rule-dnd5e/src/pluginData.ts`:**
+    *   `PlotType` Enum, `CombatantSchema`, `BattleSchema`, and their integration into `DnDStatsSchema` are correctly defined.
+    *   `generateDefaultDnDStats` correctly initializes `plotType` and `encounter`.
+*   **`plugins/game-rule-dnd5e/src/main.tsx`:**
+    *   `getBiographyGuidance`, `modifyProtagonistPrompt`, `getActionChecks` are present.
+    *   `resolveCheck` is present and calls `handleConsequence` for "initiative" checks, and returns `CheckResolutionResult`.
+    *   `getNarrativeGuidance` is implemented and handles location changes and other events, using `plotType` and `encounter` for combat narration.
+    *   `handleConsequence` is implemented and handles "damage_dealt" and "initiative_triggered" events, initializes `PCStats.encounter`, sets `PCStats.plotType` to "combat", and includes logic to end combat when all enemies are dead.
+    *   `getActions` is implemented and returns combat-specific or general actions based on `PCStats.plotType`.
+*   **`plugins/game-rule-dnd5e/src/pluginPrompt.ts`:**
+    *   `getChecksPrompt` and `getConsequenceGuidancePrompt` are well-defined.
+    *   `getDndNarrationGuidance` provides event-type-specific guidance.
+    *   The name `getBackstory` is confirmed as the decided name for the function in `pluginPrompt.ts`.
+    *   `CheckResolutionResult[]` is confirmed as the correct implementation for the `checkResolutionResults` parameter in `getNarrativeGuidance`.
+
+#### To Be Done Work
+
+*   **`lib/state.ts`:**
+    *   **Rename `CheckResolutionResult.consequenceLog` to `consequencesApplied`**.
+*   **`plugins/game-rule-dnd5e/src/main.tsx`:**
+    *   **Major Task: Enhance `resolveCheck` implementation:**
+        *   Implement comprehensive logic for various combat check types (e.g., `melee_attack`, `spell_attack`, `dash`, `disengage`, `dodge`, `help`, `hide`, `ready`, `search`, `use an object`, `death_save`). This involves calculating damage, applying status effects, and other consequences.
+        *   Ensure `resolveCheck` accurately calls `this.handleConsequence` for all state changes resulting from these checks.
+    *   **Refine `handleConsequence` implementation:**
+        *   Improve the parsing of `checkResultStatements` for "damage_dealt" to robustly identify target and damage amount.
+        *   Replace hardcoded `currentHp` and `maxHp` values for combatants during initialization with values derived from actual character stats.
+        *   Implement accurate initiative calculation using `RPGDiceRoller` and character dexterity modifiers for all combatants.
+        *   Address placeholders for missing `Character` properties when adding new characters to `globalState.characters`.
+        *   Implement actual logic for `combatLog` to log actions and increase round number.
+    *   **Implement `modifyProtagonistPrompt`:** Provide actual logic to modify the protagonist prompt based on D&D rules or plugin-specific lore, moving beyond the current placeholder.
+*   **`plugins/game-rule-dnd5e/src/pluginPrompt.ts`:**
+    *   **Minor Task:** Address the "To-Do" comment in `getDndNarrationGuidance` to add rules for timing (e.g., combat round is 6 sec, day/night).
