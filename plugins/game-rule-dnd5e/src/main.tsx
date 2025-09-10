@@ -265,7 +265,7 @@ export default class DndStatsPlugin implements Plugin, IGameRuleLogic {
     this.context.addCharacterUI(
       this.context!.pluginName, // Changed from "D&D 5E" to this.context.pluginName
       <span>D&D 5E</span>, // GameRuleTab: The ReactNode for the tab trigger.
-      <DndStatsCharacterUIPage
+      () => <DndStatsCharacterUIPage
         injectedReact={appLibs.react}
         injectedRadixThemes={appLibs.radixThemes}
         getGlobalState={this.appStateManager!.getGlobalState}
@@ -475,7 +475,7 @@ export default class DndStatsPlugin implements Plugin, IGameRuleLogic {
 
     let combatNarration = "";
     if (PCStats.plotType === "combat" && PCStats.encounter) {
-      combatNarration = `Combat Round ${PCStats.encounter.roundNumber}. Combat Log: ${PCStats.encounter.combatLog.map(log => log.replace(/\\n/g, ' ')).join("; ")}.`;
+      combatNarration = `Combat Round ${PCStats.encounter.roundNumber}. Combat Log: ${PCStats.encounter.combatLog.map(log => log.replace(/\n/g, ' ')).join("; ")}.`;
     }
 
     // 1. Get consequence guidance from internal LLM call
@@ -640,8 +640,7 @@ export default class DndStatsPlugin implements Plugin, IGameRuleLogic {
         }
 
         let charIndex = globalState?.characters.findIndex(c => c.name === char.name);
-        if (charIndex === -1 || charIndex === undefined) {
-          // If character not found in globalState.characters, add it
+        if (charIndex === -1 || charIndex === undefined) { // If character not found in globalState.characters, add it
           charIndex = globalState?.characters.length || 0;
           globalState?.characters.push({ ...char, gender: "male", race: "human", biography: "", locationIndex: 0 }); // Placeholder for missing Character properties, to-do: get LLM's description to make the call on what to put here
         }

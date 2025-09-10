@@ -59,7 +59,8 @@ As a plugin developer, I want the prompt generation logic for the `game-rule-dnd
 
 ### Acceptance Scenarios
 1. **Given** the `game-rule-dnd5e` plugin is loaded, **When** a prompt is generated (e.g., for protagonist creation or narrative guidance), **Then** the prompt logic should be executed from `pluginPrompt.ts` and the correct prompt returned.
-2. **Given** the `game-rule-dnd5e` plugin's `main.tsx` file, **When** I review its content, **Then** I should see that prompt generation logic has been removed and replaced with calls to `pluginPrompt.ts`.
+2. **Given** the `game-rule-dnd5e` plugin's `main.tsx` file, **When** I review its content, **Then** I should see that all prompt generation logics have been removed and replaced with calls to `pluginPrompt.ts`.
+3. **Given** a function in `pluginPrompt.ts` returns a prompt, **When** `main.tsx` receives this prompt, **Then** `main.tsx` can manipulate the prompt variables as needed, and `pluginPrompt.ts` should not have knowledge of these subsequent manipulations.
 
 ### Edge Cases
 - What happens if `pluginPrompt.ts` is missing or has errors? (This is an implementation detail, but the system should handle errors gracefully).
@@ -67,9 +68,10 @@ As a plugin developer, I want the prompt generation logic for the `game-rule-dnd
 ## Requirements *(mandatory)*
 
 ### Functional Requirements
-- **FR-001**: The `game-rule-dnd5e` plugin MUST centralize all prompt generation logic within `pluginPrompt.ts`.
+- **FR-001**: The `game-rule-dnd5e` plugin MUST centralize all prompt generation logic within `pluginPrompt.ts`, ensuring no actual prompt generation logic remain in `main.tsx`.
 - **FR-002**: The `main.tsx` file of the `game-rule-dnd5e` plugin MUST call functions from `pluginPrompt.ts` for all prompt generation.
 - **FR-003**: The refactoring MUST not alter the content or behavior of the generated prompts.
+- **FR-004**: Functions within `pluginPrompt.ts` MUST return prompt objects only.
 
 ---
 
@@ -77,17 +79,17 @@ As a plugin developer, I want the prompt generation logic for the `game-rule-dnd
 *GATE: Automated checks run during main() execution*
 
 ### Content Quality
-- [ ] No implementation details (languages, frameworks, APIs)
-- [ ] Focused on user value and business needs
-- [ ] Written for non-technical stakeholders
-- [ ] All mandatory sections completed
+- [x] No implementation details (languages, frameworks, APIs)
+- [x] Focused on user value and business needs
+- [x] Written for non-technical stakeholders
+- [x] All mandatory sections completed
 
 ### Requirement Completeness
-- [ ] No [NEEDS CLARIFICATION] markers remain
-- [ ] Requirements are testable and unambiguous  
-- [ ] Success criteria are measurable
-- [ ] Scope is clearly bounded
-- [ ] Dependencies and assumptions identified
+- [x] No [NEEDS CLARIFICATION] markers remain
+- [x] Requirements are testable and unambiguous  
+- [x] Success criteria are measurable
+- [x] Scope is clearly bounded
+- [x] Dependencies and assumptions identified
 
 ---
 

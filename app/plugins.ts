@@ -33,7 +33,7 @@ export interface BackendUI {
 export interface CharacterUI {
   GameRuleName: string;
   GameRuleTab: React.ReactNode;
-  GameRulePage: React.ReactNode;
+  GameRulePage: () => React.ReactNode;
 }
 
 
@@ -120,7 +120,7 @@ export class Context {
    * @param {React.ReactNode} GameRuleTab - The React component for the tab trigger.
    * @param {React.ReactNode} GameRulePage - The React component for the tab content.
    */
-  addCharacterUI(GameRuleName: string, GameRuleTab: React.ReactNode, GameRulePage: React.ReactNode): void {
+  addCharacterUI(GameRuleName: string, GameRuleTab: React.ReactNode, GameRulePage: () => React.ReactNode): void {
     getPluginsState().set((state) => {
       state.characterUIs.push({
         GameRuleName,
