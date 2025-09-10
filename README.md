@@ -23,6 +23,9 @@ All modifications are done using Gemini CLI Gemini-2.5-flash model in VS code, s
 very likely be suboptimal. This is just a proof of concept to adopt AI tools for my BA workflow
 in a development project to quickly prototype with just very basic knowledge of the stack.
 
+## Instructions for plugin
+[WIP] build test-ui-plugin (or remove it from code) and game-rule-dnd5e in the plugin directory, then follow the main guide's instructions to build and run the app with `npm run dev`
+
 ### Changes to Original Code
 
 * Internal game mechanics are handled in a plugin; the core app only receives **prompt guidance** to narrate the next scene.
@@ -41,6 +44,7 @@ in a development project to quickly prototype with just very basic knowledge of 
         * Other things like spells, equipment, and game time (combat round vs. role-play vs. travel, etc.) will be added.
 
 ---
+![Plugin](https://github.com/user-attachments/assets/cc5cc7cd-4713-49bd-8086-e2f1a4b6f05c)
 
 Many other ideas come to mind, including rules plugins for Pokémon, Gundam, and even using it to narrate a turn or generate a custom scenario for your board game would be fun.
 
