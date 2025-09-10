@@ -23,6 +23,28 @@ All modifications are done using Gemini CLI Gemini-2.5-flash model in VS code, s
 very likely be suboptimal. This is just a proof of concept to adopt AI tools for my BA workflow
 in a development project to quickly prototype with just very basic knowledge of the stack.
 
+### Changes to Original Code
+
+* Internal game mechanics are handled in a plugin; the core app only receives **prompt guidance** to narrate the next scene.
+* **rpgDiceRoller** is installed as a dependency for the core app.
+* The ability to create tabs in the **Character Select** screen has been added.
+* The ability to select/deselect an installed plugin (**enabled plugins**) has been added.
+* The ability to inject guidance for prompts based on selected game rules has been added, including:
+    * **Character backstory** based on ability score interpretation.
+    * **Biography** based on backstory.
+    * **Narration** based on **Action and Skill Check** results.
+* **D&D 5e Rules** plugin (WIP)
+    * Detects combat situations and starts **Initiative**.
+    * Determines **Ally vs. Enemy** when combat starts.
+    * Auto-generates enemies based on narration.
+    * Prompts to determine game rules and game data like ability, skill, and class are contained in the plugin.
+        * Other things like spells, equipment, and game time (combat round vs. role-play vs. travel, etc.) will be added.
+
+---
+
+Many other ideas come to mind, including rules plugins for Pokémon, Gundam, and even using it to narrate a turn or generate a custom scenario for your board game would be fun.
+
+
 ## Main story interface
 
 ![Main](https://github.com/user-attachments/assets/f0040c07-86c4-456e-8b3a-c25c7ab85293)
