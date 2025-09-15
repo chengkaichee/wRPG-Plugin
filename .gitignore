@@ -48,7 +48,10 @@ gha-creds-*.json
 # local tools
 .github/
 .gemini/
-.requirements/
+gemini.md
+session_recovery_script.md
+.Requirements/
 specs/
 scripts/
 memory/
+templates/
