@@ -198,7 +198,7 @@ export async function generateActionsPrompt(state: State): Promise<Prompt> {
   if (gameRuleLogic.getActions) {
     const actions = await gameRuleLogic.getActions();
     gameRuleActionsText = `
-Here are the available actions from the game rule logic:
+Here are the possible actions allowed in the game rule logic:
 ${actions.map((a: string) => `- ${a}`).join('\n')}
 `;
   }
@@ -325,4 +325,5 @@ ${narrationTexts}
 `;
 
   return makePrompt(userPrompt);
+  console.log("DEBUG: summarizeScenePrompt:", userPrompt); 
 }
