@@ -140,7 +140,7 @@ export default function CharacterSelect({ onNext, onBack, appLibs, appBackend, a
                       onCheckedChange={(checked) => handlePluginSelectionToggle(characterUI.GameRuleName, checked)}
                     />
                   </Flex>
-                  {characterUI.GameRulePage}
+                  {characterUI.GameRulePage()}
                 </Flex>
               </Tabs.Content>
             );

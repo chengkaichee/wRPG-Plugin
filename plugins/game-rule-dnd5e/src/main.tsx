@@ -17,7 +17,7 @@ import type { Prompt } from "@/lib/prompts";
 import type * as RadixThemes from '@radix-ui/themes';
 import type { useShallow } from 'zustand/shallow';
 import { DnDStats, generateDefaultDnDStats, DnDClassData, DnDStatsSchema, resolveCheck as getResolveCheck, Combatant } from "./pluginData";
-import { getBackstory, modifyProtagonistPromptForDnd, getChecksPrompt, getConsequenceGuidancePrompt, getDndNarrationGuidance } from "./pluginPrompt";
+import { getBackstory, modifyProtagonistPromptForDnd, getChecksPrompt, getConsequenceGuidancePrompt, getDndNarrationGuidance, getLocationChangePrompt, getCombatantsPrompt } from "./pluginPrompt";
 import * as z from "zod/v4";
 
 import type { Character, State, CheckResolutionResult } from "@/lib/state"; // Import Character and State
@@ -265,7 +265,7 @@ export default class DndStatsPlugin implements Plugin, IGameRuleLogic {
     this.context.addCharacterUI(
       this.context!.pluginName, // Changed from "D&D 5E" to this.context.pluginName
       <span>D&D 5E</span>, // GameRuleTab: The ReactNode for the tab trigger.
-      <DndStatsCharacterUIPage
+      () => <DndStatsCharacterUIPage
         injectedReact={appLibs.react}
         injectedRadixThemes={appLibs.radixThemes}
         getGlobalState={this.appStateManager!.getGlobalState}
@@ -408,13 +408,26 @@ export default class DndStatsPlugin implements Plugin, IGameRuleLogic {
     }
 
     const PCStats = this.settings as DnDStats;
+    const checkResultStatements = checkResolutionResults?.map(cr => cr.resultStatement) || [];
+
+    // Logic for other event types (user actions, combat, etc.). Find the most recent *completed* narration event
+    let sceneNarration = "";
+    for (let i = context.events.length - 1; i >= 0; i--) {
+      const event = context.events[i];
+      if (event.type === "narration" && event.text !== "") {
+        sceneNarration = event.text;
+        break;
+      }
+    }
 
     // Handle location change narration specifically
-    if (!action && (!checkResolutionResults || checkResolutionResults.length === 0) && context.events.length > 0 && context.events[context.events.length - 1].type === "location_change") {
+    // console.log(`DEBUG: Plugin: action:`, action, `# of checkResolutionResults:`, checkResolutionResults?.length, `# of events:`, context.events.length, `last event type:`, context.events.length > 0 ? context.events[context.events.length - 2].type : "N/A");
+    if (!action && (!checkResolutionResults || checkResultStatements.length === 0) && context.events.length > 0 && context.events[context.events.length - 2].type === "location_change") {
       let previousLocationName = `a location from protagonist's backstory: ${this.settings.backstory || ""}`;
       let newLocationName = "new plot line location";
       let newLocationDescription = "";
       let presentCharactersInfo = "";
+      let newLocationTrigger = "N/A"; // Initialize with a default value      
       console.log("DEBUG: Plugin: Handling location change narration...");
 
       // Find the most recent LocationChangeEvent
@@ -423,8 +436,8 @@ export default class DndStatsPlugin implements Plugin, IGameRuleLogic {
         if (event.type === "location_change") {
           newLocationName = context.locations[event.locationIndex].name;
           newLocationDescription = context.locations[event.locationIndex].description;
-          console.log("DEBUG: Plugin: found New Location Name:", newLocationName);
-
+          // console.log("DEBUG: Plugin: found New Location Name:", newLocationName);
+          
           // Try to find the previous location from the event history
           // This is a heuristic and might not always be accurate if events are reordered or missing
           if (i > 0) {
@@ -436,50 +449,33 @@ export default class DndStatsPlugin implements Plugin, IGameRuleLogic {
               } else if (prevEvent.type === "narration" && prevEvent.locationIndex !== undefined) {
                 // If a narration event has a location index, it might indicate the previous location
                 previousLocationName = context.locations[prevEvent.locationIndex].name;
+                newLocationTrigger = prevEvent.text; // Use this narration as the trigger
                 break;
               }
             }
           }
-          console.log("DEBUG: Plugin: found Previous Location Name:", previousLocationName);
+          // console.log("DEBUG: Plugin: found Previous Location Name:", previousLocationName);
 
           if (event.presentCharacterIndices && event.presentCharacterIndices.length > 0) {
             presentCharactersInfo = `Present characters: ${event.presentCharacterIndices.map(idx => context.characters[idx].name).join(", ")}.`;
-            console.log ("DEBUG: Plugin: Present Characters Info:", presentCharactersInfo);
+            // console.log ("DEBUG: Plugin: Present Characters Info:", presentCharactersInfo);
           }
           break;
         }
       }
 
-      const locationChangePrompt: Prompt = {
-        system: "You are an expert DM in Dungeons & Dragons 5th Edition in the narrative style of famous DM Matt Mercer. Maintain story continuity. Focus on the protagonist's journey and goals.",
-        user: `The protagonist has moved from ${previousLocationName} to ${newLocationName}. ${newLocationDescription}. There are ${presentCharactersInfo} in this new location.
-        Narrate this transition. Emphasize the reason for the new scene in the continuity of the story (e.g., continuing a quest, seeking something, fleeing). 
-        Describe the new location and its immediate relevance to the protagonist's ongoing plot or implied goal in 250 words or less.
-        Ensure your narration aligns with D&D 5e fantasy themes, character abilities, and typical role-playing scenarios that the famous DM Matt Mercer would narrate.`,
-      };
+      const locationChangePrompt = getLocationChangePrompt(previousLocationName, newLocationName, newLocationDescription, presentCharactersInfo, newLocationTrigger);
       const narration = await this.appBackend!.getBackend().getNarration(locationChangePrompt);
-      console.log ("DEBUG: Plugin: Guidance for New Location Prompt:", locationChangePrompt);
+      // console.log ("DEBUG: Plugin: Guidance for New Location Prompt:", locationChangePrompt);
       return [narration];
-    }
-
-    // Logic for other event types (user actions, combat, etc.)
-    let sceneNarration = "";
-    // Find the most recent *completed* narration event
-    for (let i = context.events.length - 1; i >= 0; i--) {
-      const event = context.events[i];
-      if (event.type === "narration" && event.text !== "") {
-        sceneNarration = event.text;
-        break;
-      }
     }
 
     let combatNarration = "";
     if (PCStats.plotType === "combat" && PCStats.encounter) {
-      combatNarration = `Combat Round ${PCStats.encounter.roundNumber}. Combat Log: ${PCStats.encounter.combatLog.map(log => log.replace(/\\n/g, ' ')).join("; ")}.`;
+      combatNarration = `Combat Round ${PCStats.encounter.roundNumber}. Combat Log: ${PCStats.encounter.combatLog.map(log => log.replace(/\n/g, ' ')).join("; ")}.`;
     }
 
     // 1. Get consequence guidance from internal LLM call
-    const checkResultStatements = checkResolutionResults?.map(cr => cr.resultStatement) || [];
     let consequenceGuidance: string;
 
     if (!action && checkResultStatements.length === 0) {
@@ -550,17 +546,17 @@ export default class DndStatsPlugin implements Plugin, IGameRuleLogic {
 
         if (targetCombatant) {
           targetCombatant.currentHp -= damageAmount;
-          PCStats.encounter.combatLog.push(`${targetName} took ${damageAmount} damage.`);
+          PCStats.encounter.combatLog = [...PCStats.encounter.combatLog, `${targetName} took ${damageAmount} damage.`];
 
           if (targetCombatant.currentHp <= 0) {
             targetCombatant.status = "dead";
-            PCStats.encounter.combatLog.push(`${targetName} is dead.`);
+            PCStats.encounter.combatLog = [...PCStats.encounter.combatLog, `${targetName} is dead.`];
             // Check if all enemies are dead to end combat
             const remainingEnemies = PCStats.encounter.combatants.filter(
               (c: Combatant) => c.status !== "dead" && c.status !== "fled" && c.status !== "surrendered" && c.isFriendly === false
             );
             if (remainingEnemies.length === 0) {
-              PCStats.encounter.combatLog.push("Combat ends.");
+              PCStats.encounter.combatLog = [...PCStats.encounter.combatLog, `Combat ends.`];
               PCStats.plotType = "general";
               PCStats.encounter = undefined; // Clear encounter data
             }
@@ -600,20 +596,7 @@ export default class DndStatsPlugin implements Plugin, IGameRuleLogic {
         }
       }
 
-      const combatantsPrompt: Prompt = {
-        system: "You are an expert DM in Dungeons & Dragons 5th Edition in the narrative style of famous DM Matt Mercer.",
-        user: `Based on the following scene narration, identify the combat participants:\n\nScene: ${sceneNarration}\nProtagonist: ${globalState?.protagonist.name}\n\nProvide a JSON object with the following structure:\n{\n  "friendlyCharacters": [
-    { "name": "Protagonist's Name" },
-    { "name": "Ally 1 Name" }
-  ],
-  "namedEnemies": [
-    { "name": "Enemy 1 Name" },
-    { "name": "Enemy 2 Name" }
-  ],
-  "unnamedEnemiesCount": 0,
-  "encounterDescription": "A brief description of the combat encounter."
-}`,
-      };
+      const combatantsPrompt = getCombatantsPrompt(sceneNarration, globalState?.protagonist.name || "");
 
       // Make LLM call
       const combatantsLLMResponse = await this.appBackend!.getBackend().getObject(combatantsPrompt, CombatantsLLMSchema);
@@ -640,8 +623,7 @@ export default class DndStatsPlugin implements Plugin, IGameRuleLogic {
         }
 
         let charIndex = globalState?.characters.findIndex(c => c.name === char.name);
-        if (charIndex === -1 || charIndex === undefined) {
-          // If character not found in globalState.characters, add it
+        if (charIndex === -1 || charIndex === undefined) { // If character not found in globalState.characters, add it
           charIndex = globalState?.characters.length || 0;
           globalState?.characters.push({ ...char, gender: "male", race: "human", biography: "", locationIndex: 0 }); // Placeholder for missing Character properties, to-do: get LLM's description to make the call on what to put here
         }

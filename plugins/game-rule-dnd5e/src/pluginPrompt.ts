@@ -149,24 +149,32 @@ In Dungeons & Dragons 5th Edition, ability scores range from 1 to 10, with 10-11
  */
 export function getBackstory(stats: DnDStats, pc: StoredState): Prompt { //rename to getStatsInterpretations
   return {
-    system: "You are an expert DM in Dungeons & Dragons 5th Edition in the narrative style of famous DM Matt Mercer. Your task is to provide a descriptive interpretation of a character's attributes based on their numerical values and the provided D&D 5e rules.",
+    system: `You are a helpful dungeon master trained to generate character backstory using Dungeons & Dragons 5th Edition rules in simple sentences in style of famous DM Matt Mercer. 
+    Your task is to provide a descriptive interpretation of a character's attributes based on their numerical values in provided D&D 5e context.`,
     user: `Given the following D&D 5e attribute scores:
-Strength: ${stats.strength}
-Dexterity: ${stats.dexterity}
-Constitution: ${stats.constitution}
-Intelligence: ${stats.intelligence}
-Wisdom: ${stats.wisdom}
-Charisma: ${stats.charisma}
-Level: ${stats.dndLevel}
-Class: ${stats.dndClass}
-SubClass: ${stats.dndSubclass}
-Gender: ${pc.protagonist.gender}
-Race: ${pc.protagonist.race}
+      Strength: ${stats.strength}
+      Dexterity: ${stats.dexterity}
+      Constitution: ${stats.constitution}
+      Intelligence: ${stats.intelligence}
+      Wisdom: ${stats.wisdom}
+      Charisma: ${stats.charisma}
+      Level: ${stats.dndLevel}
+      Class: ${stats.dndClass}
+      SubClass: ${stats.dndSubclass}
+      Gender: ${pc.protagonist.gender}
+      Race: ${pc.protagonist.race}
 
-And the following descriptive guidance from D&D 5e rules:
-${coreAttributesContent}
+    And the following descriptive guidance from D&D 5e rules:
+    ${coreAttributesContent}
 
-Provide a concise, narrative-friendly description of the character's core attributes, incorporating the descriptive interpretations. Focus on how these attributes would manifest in the character's personality, physical presence, and abilities. Based on the pattern of the attributes add a couple of backstory to explain the outlier attributes tied to the gender, race during upbringing and the eventual growth to their class and subclass (if applicable). Do not include the numerical values in your description.`,
+    Provide a concise, narrative guiding description of the character's core attributes, incorporating descriptive interpretations. 
+    Focus on how these attributes would manifest in the character's personality, physical presence, and abilities. 
+    Based on the pattern of the attributes add a couple of backstory to explain the outlier attributes tied to the gender and race during upbringing and the eventual growth based on their level to their class and subclass (if applicable). 
+    Provide a current physical description of the character based on their attributes and backstory.
+
+    DO NOT repeat the numerical values of the attributes in your description.
+    DO NOT include numerical modifiers or numbers in your description.
+    Use 500 words or less.`,
   };
 }
 
@@ -295,41 +303,40 @@ export function getChecksPrompt(action: string, plotType: string): Prompt {
   }
 
   return {
-    system: `You are an expert DM in Dungeons & Dragons 5th Edition in the narrative style of famous DM Matt Mercer. Your task is to analyze a given action or situation and determine if a skill check is required and if so, what are the most appropriate D&D 5e skill checks required to resolve it. 
+    system: `You are a helpful Dungeon Master in Dungeons & Dragons 5th Edition with the play style of famous DM Matt Mercer. Your task is to analyze a given action or situation and determine if a skill check is required, and if so what are the most appropriate D&D 5e skill checks required to resolve it. 
     ${initiativeGuidance}
     You must return an array of CheckDefinition objects in JSON format.
 
-Each CheckDefinition object must have the following properties:
-- 'type': A string representing the skill (e.g., \"athletics\", \"stealth\", \"perception\") or attribute (e.g., \"strength\", \"dexterity\", \"intelligence\", \"wisdom\", \"charisma\", \"constitution\") being checked, or \"to-hit\" for attack rolls, or \"initiative\" for combat initiation.
-- 'difficultyClass': A number representing the target number to beat for a successful check, or the AC of the target if this is an attack roll \"to-hit\".
-- 'modifiers': An optional array of strings representing the character attributes relevant to the check (e.g., [\"strength\", \"dexterity\"]).
+    Each CheckDefinition object must have the following properties:
+    - 'type': A string representing the skill (e.g., \"athletics\", \"stealth\", \"perception\") or attribute (e.g., \"strength\", \"dexterity\", \"intelligence\", \"wisdom\", \"charisma\", \"constitution\") being checked, or \"to-hit\" for attack rolls, or \"initiative\" for combat initiation.
+    - 'difficultyClass': A number representing the target number to beat for a successful check, or the AC of the target if this is an attack roll \"to-hit\".
+    - 'modifiers': An optional array of strings representing the character attributes relevant to the check (e.g., [\"strength\", \"dexterity\"]).
 
-Your output must be a JSON array of CheckDefinition objects, and nothing else. For example:
-[
-  {
-    "type": "stealth",
-    "difficultyClass": 5,
-    "modifiers": ["dexterity"]
-  },
-  {
-    "type": "perception",
-    "difficultyClass": 10,
-    "modifiers": ["wisdom"]
-  }
+    Your output must be a JSON array of CheckDefinition objects, and nothing else. For example:
+    [
+      {
+        "type": "stealth",
+        "difficultyClass": 5,
+        "modifiers": ["dexterity"]
+      },
+      {
+        "type": "perception",
+        "difficultyClass": 10,
+        "modifiers": ["wisdom"]
+      }
 
-]
-You should consider the context of the action/situation and the typical challenges associated with it in a D&D 5e setting. 
-If multiple checks are appropriate, list them all. 
-Trivial tasks like accepting an offer, believing in someone, giving or receiving an item/goods are automatic success so all difficultyClass for these are set to 0,
-Here are the D&D 5e core skills and guidelines for difficulty classes:
-${coreSkillsAndDifficultyCheckContent}
+    ]
 
-]`, 
+    You should consider the context of the action/situation and the typical challenges associated with it in a D&D 5e setting. 
+    If multiple checks are appropriate, list them all. 
+    Trivial tasks like accepting an offer, believing in someone, giving or receiving an item/goods are automatic success so all difficultyClass for these are set to 0,
+    Here are the D&D 5e core skills and guidelines for difficulty classes:
+    ${coreSkillsAndDifficultyCheckContent}`,
     user: ` Given the situation/action: "${action}", does it require a skill check?
     if so which D&D 5e skill check(s) / saving throw is required? If multiple checks are appropriate, list them all.
     if you can not determine what specific check is needed, return an empty array.
     Trivial actions like accepting a task/quest or acknowledge someone's point of view is auto success so all difficultyClass for these are set to 0
-    Provide your answer as a JSON array of CheckDefinition objects.`, 
+    Provide your answer as a JSON array of CheckDefinition objects.`,
   };
 }
 
@@ -381,7 +388,7 @@ export function getConsequenceGuidancePrompt(sceneNarration: string, actionText:
     ***** Check results (if any):
     ${allCheckResults}
     *****
-    
+    \n\n\n******\n\n\n
     Base on these you will only provide objective ANSWERS, in single concise guidance statement of less than 10 words each.
     - Is there any information gained/missed, what information?
     - Is there any item exchanged, what item?
@@ -389,7 +396,18 @@ export function getConsequenceGuidancePrompt(sceneNarration: string, actionText:
     - Is there any relationship altered, who is affected and how?
     - Is there any ally or enemy gained/lost, who?
     - Does this lead to combat, chase, or negotiation?
-    - Is this consequence ends in a disastrous outcome, what is it?`,
+    - Is this consequence ends in a disastrous outcome, what is it?
+    Only use 10 words or less per guidance, they must be short, clear and concise of possible ideas based on the situation in one single sentence per check result if it is provided.
+    \n\n\n******\n\n\n
+    For example:
+    If the check results is "Stealth check (DC 15): Roll 18 (Success)", you should say "You successfully sneak past the guards unnoticed."
+    If multiple checks are provided, give a separate guidance for each check result.
+    If no checks were needed, provide a single concise guidance based on the action and scene like "You agree to join so and so in their quest. so and so are now your ally."
+    If the action is trivial (DC 0), it is considered an automatic success, so provide guidance accordingly like "You easily accomplish the task without any issues."
+    Do NOT mention the check results, DC, or roll numbers in your guidance.
+    Do NOT suggest new actions or next steps, only focus on the consequences of the action taken.
+    Do NOT make up new information not implied by the scene or action.
+    Do NOT repeat information already present in the scene or action text.`,
   };
 }
 
@@ -410,4 +428,65 @@ export function getDndNarrationGuidance(eventType: string): string {
     guidance += dndRulesDMStyle;
   }
   return guidance;
+}
+
+/**
+ * @function getLocationChangePrompt
+ * @description Constructs a Prompt object for location change narration.
+ * @param previousLocationName - The name of the previous location.
+ * @param newLocationName - The name of the new location.
+ * @param newLocationDescription - The description of the new location.
+ * @param presentCharactersInfo - Information about characters present in the new location.
+ * @returns A Prompt object with system and user messages for location change narration.
+ */
+export function getLocationChangePrompt(
+  previousLocationName: string,
+  newLocationName: string,
+  newLocationDescription: string,
+  presentCharactersInfo: string,
+  newLocationTrigger: string
+): Prompt {
+  return {
+    system: "You are an story plot line author. Your goal is to maintain story continuity focusing on the protagonist's journey, character growth, development and goals.",
+    user: `The protagonist has physically traveled to ${newLocationName}. ${newLocationDescription} FROM ${previousLocationName}. \n 
+        The transition was triggered by: \"${newLocationTrigger}\". If trigger is empty then this is a start of a new story. \n         
+        There are ${presentCharactersInfo} in this new location but don't mention them if they haven't met protagonist yet from previous scene. 
+        They may not all be in the same visible vicinity of the protagonist, 
+        They may not all be friendly or allied to the protagonist, 
+        They may not all be aware of the protagonist's presence.
+        Use this information as context to Narrate this transition in 2 Sentences below: \n 
+        In a simple single sentence describe the reason for the new scene in the continuity of the story (e.g., continuing a quest, seeking something, fleeing) in 100 words or less. \n 
+        In a simple single sentences describe the new location's immediate relevance to the protagonist's ongoing plot or implied goal in 100 words or less. \n 
+        Ensure your narration aligns with D&D 5e fantasy themes, character abilities, and suitable for role-playing scenarios and no more than 200 words in total.`,
+  };
+}
+
+/**
+ * @function getCombatantsPrompt
+ * @description Constructs a Prompt object for the LLM to identify combat participants.
+ * @param sceneNarration - The current scene narration text.
+ * @param protagonistName - The name of the protagonist.
+ * @returns A Prompt object with system and user messages for identifying combatants.
+ */
+export function getCombatantsPrompt(sceneNarration: string, protagonistName: string): Prompt {
+  return {
+    system: "You are an expert DM in Dungeons & Dragons 5th Edition in the narrative style of famous DM Matt Mercer.",
+    user: `Based on the following scene narration, identify the combat participants: 
+    
+    Scene: ${sceneNarration} 
+    Protagonist: ${protagonistName} 
+    
+    Provide a JSON object with the following structure:
+    { "friendlyCharacters": [
+    { "name": "Protagonist's Name" },
+    { "name": "Ally 1 Name" }
+    ],
+      "namedEnemies": [
+    { "name": "Enemy 1 Name" },
+    { "name": "Enemy 2 Name" }
+    ],
+      "unnamedEnemiesCount": 0,
+      "encounterDescription": "A brief description of the combat encounter."
+    }`,
+  };
 }
