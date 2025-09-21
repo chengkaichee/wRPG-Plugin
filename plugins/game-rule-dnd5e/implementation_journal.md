@@ -47,3 +47,26 @@
 **Current Status:**
 - `main.tsx` changes for `combatLog` immutability are applied.
 - Proceeding with post-execution verification.
+
+### Date: September 17, 2025
+
+**Task:** Implement T005: Internal state management for Prompt Testing section in `StateDebugger.tsx`.
+
+**Outcome:**
+- Added `useState` hooks for `narrationPrompt`, `setNarrationPrompt`, `narrationOutput`, `setNarrationOutput`, `narrationIsLoading`, `setNarrationIsLoading`, `narrationError`, and `setNarrationError` in `components/StateDebugger.StateDebugger.tsx`.
+- Removed incorrect `useAppBackend` import and related `isLoading`, `error` destructuring.
+- TypeScript type check passed successfully.
+
+**Conclusion:** T005 is completed.
+
+### Date: September 17, 2025
+
+**Task:** Implement T006: Implement `handlePromptChange` function to update `narrationPrompt` on textarea change.
+
+**Outcome:**
+- Implemented `handlePromptChange` function to update `narrationPrompt` state on textarea change.
+- Added `useEffect` hook to initialize `narrationPrompt` from `state.lastNarrationContext.lastPrompt` when the editor expands.
+- Connected `handlePromptChange` to the `onChange` event of the "Prompt Used" textarea.
+- TypeScript type check passed successfully.
+
+**Conclusion:** T006 is completed.

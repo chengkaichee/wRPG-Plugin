@@ -174,7 +174,7 @@ export function getBackstory(stats: DnDStats, pc: StoredState): Prompt { //renam
 
     DO NOT repeat the numerical values of the attributes in your description.
     DO NOT include numerical modifiers or numbers in your description.
-    Use 500 words or less.`,
+    Your entire response must be no more than 420 words. Do not exceed this limit. If your answer would be longer, stop at exactly 420 words and do not continue. Do not mention the word count in your answer.`,
   };
 }
 
@@ -364,9 +364,10 @@ export function getConsequenceGuidancePrompt(sceneNarration: string, actionText:
        - altering relationship, 
        - leads to combat, 
        - or disastrous outcome, etc... 
-    Only use 10 words or less per guidance, they must be short, clear and concise of possible ideas based on the situation in one single sentence per check result if it is provided.
-    For example:
-    If the check results is "Stealth check (DC 15): Roll 18 (Success)", you should say "You successfully sneak past the guards unnoticed."
+    Your entire response must be no more than 10 words per guidance. Do not exceed this limit. If your answer would be longer, stop at exactly 10 words per guidance and do not continue. Do not mention the word count in your answer. 
+    They must be short, clear and concise of possible ideas based on the situation in one single sentence per check result if it is provided. For example:
+    ** If the check results is "Stealth check (DC 15): Roll 18 (Success)", you should say "You successfully sneak past the guards unnoticed."
+     \n\n\n******\n\n\n
     If multiple checks are provided, give a separate guidance for each check result.
     If no checks were needed, provide a single concise guidance based on the action and scene like "You agree to join so and so in their quest. so and so are now your ally."
     If the action is trivial (DC 0), it is considered an automatic success, so provide guidance accordingly like "You easily accomplish the task without any issues."
@@ -389,7 +390,7 @@ export function getConsequenceGuidancePrompt(sceneNarration: string, actionText:
     ${allCheckResults}
     *****
     \n\n\n******\n\n\n
-    Base on these you will only provide objective ANSWERS, in single concise guidance statement of less than 10 words each.
+    Base on these you will only provide objective ANSWERS, in single concise guidance statement of less than 10 words per guidance.
     - Is there any information gained/missed, what information?
     - Is there any item exchanged, what item?
     - Is there any key item lost, what item?
@@ -397,10 +398,12 @@ export function getConsequenceGuidancePrompt(sceneNarration: string, actionText:
     - Is there any ally or enemy gained/lost, who?
     - Does this lead to combat, chase, or negotiation?
     - Is this consequence ends in a disastrous outcome, what is it?
-    Only use 10 words or less per guidance, they must be short, clear and concise of possible ideas based on the situation in one single sentence per check result if it is provided.
+     Your entire response must be no more than 10 words per guidance. Do not exceed this limit. If your answer would be longer, stop at exactly 10 words per guidance and do not continue. Do not mention the word count in your answer. 
+    They must be short, clear and concise of possible ideas based on the situation in one single sentence per check result if it is provided. 
     \n\n\n******\n\n\n
     For example:
     If the check results is "Stealth check (DC 15): Roll 18 (Success)", you should say "You successfully sneak past the guards unnoticed."
+    \n\n\n******\n\n\n
     If multiple checks are provided, give a separate guidance for each check result.
     If no checks were needed, provide a single concise guidance based on the action and scene like "You agree to join so and so in their quest. so and so are now your ally."
     If the action is trivial (DC 0), it is considered an automatic success, so provide guidance accordingly like "You easily accomplish the task without any issues."

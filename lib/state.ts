@@ -137,6 +137,7 @@ export const initialState: State = schemas.State.parse({
   violentContentLevel: "regular",
   events: [],
   actions: [],
+  lastNarrationContext: null,
 });
 
 /**
@@ -364,6 +365,7 @@ export interface Actions {
     shouldReplace?: false,
   ) => void;
   setAsync: (updater: (state: WritableDraft<StoredState>) => Promise<void>) => Promise<void>;
+  setLastNarrationContext: (context: z.infer<typeof schemas.State.shape.lastNarrationContext> | null) => void;
 }
 
 /**
@@ -413,6 +415,19 @@ export const useStateStore = create<StoredState>()(
           set(newState);
         });
       },
+      /**
+       * @method setLastNarrationContext
+       * @description Updates the `lastNarrationContext` in the global state.
+       * This action should be called when a narration prompt is sent to the backend
+       * and the corresponding NarrationEvent is received, to capture the last
+       * prompt and its generated narration for the Prompt Testing Screen.
+       * @param {z.infer<typeof schemas.State.shape.lastNarrationContext> | null} context - The context containing the last prompt and narration event, or null to clear it.
+       */
+      setLastNarrationContext: (context: z.infer<typeof schemas.State.shape.lastNarrationContext> | null) => {
+        set((state) => {
+          state.lastNarrationContext = context;
+        });
+      },
     })),
     {
       name: "state",
@@ -429,6 +444,7 @@ export const useStateStore = create<StoredState>()(
         delete persistedState.backends;
         delete persistedState.set;
         delete persistedState.setAsync;
+        delete persistedState.setLastNarrationContext; // Ensure this new action is not persisted
 
         return persistedState;
       },

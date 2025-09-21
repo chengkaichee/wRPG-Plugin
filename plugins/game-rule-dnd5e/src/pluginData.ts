@@ -53,6 +53,55 @@ export const DnDStatsSchema = z.object({
 export type DnDStats = z.infer<typeof DnDStatsSchema>;
 
 /**
+ * Function to suggest a default class based on D&D 5e stats.
+ * @param stats The DnDStats object.
+ * @returns A suggested class name.
+ */
+export function suggestDefaultClass(stats: DnDStats): string {
+  const { strength, dexterity, constitution, intelligence, wisdom, charisma } = stats;
+
+  // Find the highest stat(s)
+  const statArr = [
+    { key: 'strength', value: strength },
+    { key: 'dexterity', value: dexterity },
+    { key: 'constitution', value: constitution },
+    { key: 'intelligence', value: intelligence },
+    { key: 'wisdom', value: wisdom },
+    { key: 'charisma', value: charisma },
+  ];
+  statArr.sort((a, b) => b.value - a.value);
+  const top = statArr[0];
+  const second = statArr[1];
+
+  // Case logic for class suggestion
+  switch (top.key) {
+    case 'strength':
+      return 'Fighter';
+    case 'dexterity':
+      if (second.key === 'wisdom') return 'Ranger';
+      return 'Rogue';
+    case 'intelligence':
+      return 'Wizard';
+    case 'constitution':
+      if (second.key === 'strength') return 'Barbarian';
+      if (second.key === 'wisdom') return 'Druid';
+      if (second.key === 'intelligence') return 'Wizard';
+      if (second.key === 'charisma') return 'Sorcerer';      
+      if (second.key === 'dexterity') return 'Rogue';            
+      return 'Fighter';
+    case 'wisdom':
+      if (second.key === 'dexterity') return 'Monk';      
+      return 'Cleric';
+    case 'charisma':
+      if (strength >= 13) return 'Paladin';
+      if (second.key === 'constitution') return 'Warlock';  
+      return 'Bard';
+    default:
+      return 'Fighter';
+  }
+}
+
+/**
  * Function to generate default values for D&D character stats using dice rolls.
  * Used when no settings are provided or to fill in missing values.
  */
@@ -61,7 +110,7 @@ export const generateDefaultDnDStats = (rpgDiceRoller: typeof RpgDiceRoller): Dn
 
   const rollAttribute = () => new rpgDiceRoller.DiceRoll(rollFormula).total;
 
-  const generated = {
+  const generatedStats = {
     strength: rollAttribute(),
     dexterity: rollAttribute(),
     constitution: rollAttribute(),
@@ -78,7 +127,15 @@ export const generateDefaultDnDStats = (rpgDiceRoller: typeof RpgDiceRoller): Dn
     encounter: undefined,
     backstory: "",
   };
-  return generated;
+
+  const suggestedClass = suggestDefaultClass(generatedStats);
+  //const suggestedSubclass = DnDClassData[suggestedClass]?.[0] || ""; // Pick first subclass if available
+
+  return {
+    ...generatedStats,
+    dndClass: suggestedClass,
+    //dndSubclass: suggestedSubclass,
+  };
 };
 
 export type DndClassData = {

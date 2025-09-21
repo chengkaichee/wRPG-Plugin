@@ -186,4 +186,12 @@ export const State = z.object({
   violentContentLevel: ViolentContentLevel,
   events: Event.array(),
   actions: Action.array(),
+  /**
+   * @description Stores the last prompt sent for narration generation and the resulting NarrationEvent.
+   * Used by the Prompt Testing Screen to capture and regenerate previous narration.
+   */
+  lastNarrationContext: z.nullable(z.object({
+    lastPrompt: Text,
+    lastNarrationEvent: NarrationEvent,
+  })).optional(),
 });

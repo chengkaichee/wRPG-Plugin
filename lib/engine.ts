@@ -332,6 +332,12 @@ export async function next(
           updateState();
         }
       }
+
+      // T022: Update lastNarrationContext after all modifications to 'event' are complete
+      getState().setLastNarrationContext({
+        lastPrompt: narrationPromptContent.user,
+        lastNarrationEvent: event,
+      });
     };
 
     try {
