@@ -283,7 +283,7 @@ export default class DndStatsPlugin implements Plugin, IGameRuleLogic {
             try {
               const generatedBackstory = await this.appBackend!.getNarration(prompt, (token, count) => {
                 this.appUI!.updateProgress("Generating Backstory", "Please wait while your character is going through early life...", count, true);
-              });
+              }); // Approximately 300 words
 
               finalSettings = { ...newSettings, backstory: generatedBackstory };
               this.appUI!.updateProgress("Backstory Generated", "Your character's history is ready!", -1, false);
@@ -465,7 +465,7 @@ export default class DndStatsPlugin implements Plugin, IGameRuleLogic {
       }
 
       const locationChangePrompt = getLocationChangePrompt(previousLocationName, newLocationName, newLocationDescription, presentCharactersInfo, newLocationTrigger);
-      const narration = await this.appBackend!.getBackend().getNarration(locationChangePrompt);
+      const narration = await this.appBackend!.getNarration(locationChangePrompt); // Approx 200 words
       // console.log ("DEBUG: Plugin: Guidance for New Location Prompt:", locationChangePrompt);
       return [narration];
     }
@@ -599,7 +599,7 @@ export default class DndStatsPlugin implements Plugin, IGameRuleLogic {
       const combatantsPrompt = getCombatantsPrompt(sceneNarration, globalState?.protagonist.name || "");
 
       // Make LLM call
-      const combatantsLLMResponse = await this.appBackend!.getBackend().getObject(combatantsPrompt, CombatantsLLMSchema);
+      const combatantsLLMResponse = await this.appBackend!.getObject(combatantsPrompt, CombatantsLLMSchema);
 
       const allCombatants: Combatant[] = [];
 

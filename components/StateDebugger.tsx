@@ -4,19 +4,28 @@
 import { IconButton, Text, Tooltip, VisuallyHidden } from "@radix-ui/themes";
 import dynamic from "next/dynamic";
 import { Dialog } from "radix-ui";
-import { useState } from "react";
-import { GiAllSeeingEye } from "react-icons/gi";
-import { RxCross2 } from "react-icons/rx";
+import { useState, useEffect, useRef } from "react";
+import { GiAllSeeingEye, GiAcousticMegaphone, GiCancel, GiCardExchange, GiBigGear } from "react-icons/gi";
+import { RxCross2, RxTriangleDown, RxTriangleRight } from "react-icons/rx";
 import { useShallow } from "zustand/shallow";
 import { type StoredState, useStateStore } from "@/lib/state";
+import { type IAppBackend } from "@/app/services/AppBackend";
+import { type Prompt } from "@/lib/prompts";
 
 // https://github.com/mac-s-g/react-json-view/issues/121#issuecomment-2578199942
 const ReactJsonView = dynamic(() => import("@microlink/react-json-view"), { ssr: false });
 
-export default function StateDebugger() {
+export default function StateDebugger({ appBackend }: { appBackend: IAppBackend }) {
   // We need to manually open the dialog using a custom event handler,
   // because the Tooltip component is incompatible with Dialog.Trigger.
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [promptEditorExpanded, setPromptEditorExpanded] = useState(false);
+  const [narrationPrompt, setNarrationPrompt] = useState("");
+  const narrationReset = useRef("");
+  const [narrationOutput, setNarrationOutput] = useState("");
+  const narrationOutputReset = useRef("");
+  const [narrationIsLoading, setNarrationIsLoading] = useState(false);
+  const [narrationError, setNarrationError] = useState<string | null>(null);
 
   const { state, setState } = useStateStore(
     useShallow((state) => ({
@@ -24,6 +33,63 @@ export default function StateDebugger() {
       setState: state.set,
     })),
   );
+
+  // Effect to update narration text areas when lastNarrationContext changes
+  useEffect(() => {
+    if (state.lastNarrationContext) {
+      setNarrationPrompt(state.lastNarrationContext.lastPrompt);
+      narrationReset.current = state.lastNarrationContext.lastPrompt;      
+      setNarrationOutput(state.lastNarrationContext.lastNarrationEvent.text);
+      narrationOutputReset.current = state.lastNarrationContext.lastNarrationEvent.text;
+    }
+  }, [state.lastNarrationContext]);
+
+  // Function to handle changes in the narration prompt textarea
+  const handlePromptChange = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setNarrationPrompt(event.target.value);
+  };
+
+  const handleGeneratePrompt = async () => {
+    if (narrationIsLoading) return;
+    setNarrationIsLoading(true);
+    setNarrationError(null);
+    setNarrationOutput("Narrating...");
+
+    try {
+      const prompt: Prompt = {
+        // This system prompt is hardcoded in lib/prompts.ts and should be consistent.
+        system: "You are the game master of a text-based fantasy role-playing game.",
+        user: narrationPrompt,
+      };
+      const result = await appBackend.getNarration(prompt);
+      setNarrationOutput(result);
+    } catch (error: any) {
+      setNarrationError(error.message || "An unknown error occurred.");
+    } finally {
+      setNarrationIsLoading(false);
+    }
+  };
+
+  const handleReplaceNarration = async () => {
+    setState((stateDraft) => {
+      let lastNarrationEventIndex = -1;
+        for (let i = stateDraft.events.length - 1; i >= 0; i--) {
+          if (stateDraft.events[i].type === "narration") {
+            lastNarrationEventIndex = i;
+            break;
+          }
+        }
+        if (lastNarrationEventIndex !== -1) {
+          // Cast to any to avoid type issues with Zod discriminated union
+          (stateDraft.events[lastNarrationEventIndex] as any).text = narrationOutput;
+        } else {
+          console.error("No narration event found in the events array to replace.");
+          setNarrationError("No narration event found in the events array to replace.");
+        }
+      }
+    );
+    setNarrationError(null); // Clear any previous errors
+  };
 
   // Remove properties containing functions to avoid corrupting them,
   // as functions cannot be edited and would be overwritten by garbage.
@@ -57,7 +123,7 @@ export default function StateDebugger() {
           onInteractOutside={(event) => event.preventDefault()}
           className="fixed top-0 right-0 bottom-0 w-xs grid overflow-auto pl-1 border-l border-(--gold-10) bg-[rgb(30,30,30)]"
         >
-          <VisuallyHidden>
+          <VisuallyHidden> 
             <Dialog.Title className="DialogTitle">State debugger</Dialog.Title>
           </VisuallyHidden>
           <ReactJsonView
@@ -75,6 +141,73 @@ export default function StateDebugger() {
             onEdit={(edit) => setState(edit.updated_src)}
             onDelete={(edit) => setState(edit.updated_src)}
           />
+
+          {/* New section for Prompt Testing Screen */}
+          <div className="mt-4 p-2 border-t border-gray-700">
+            <div className="flex items-center cursor-pointer" onClick={() => setPromptEditorExpanded(!promptEditorExpanded)}>
+              {promptEditorExpanded ? (
+                <RxTriangleDown className="mr-1 text-amber-500" />
+              ) : (
+                <RxTriangleRight className="mr-1 text-amber-500" />
+              )}
+              <h3 className="text-lg font-bold text-white">Narration Editor</h3>
+            </div>
+            {promptEditorExpanded && (
+              <div className="mt-2">
+                <p className="text-white">Prompt Used:</p>
+                <textarea
+                  className="w-full bg-gray-700 text-white p-2 rounded resize-y"
+                  value={narrationPrompt}
+                  onChange={handlePromptChange}
+                  rows={10}
+                />
+                <p className="mt-4 text-white">Generated Narration:</p>
+                <textarea
+                  className="w-full bg-gray-800 text-gray-300 p-2 rounded resize-y"
+                  value={narrationOutput}
+                  onChange={(e) => setNarrationOutput(e.target.value)}
+                  rows={10}
+                  disabled={narrationIsLoading}
+                />
+                {narrationError && <p className="mt-2 text-red-500">Error: {narrationError}</p>}
+                <div className="mt-4 flex justify-around">
+                  <Tooltip content="Generate">
+                    <IconButton
+                      variant="ghost"
+                      color="amber"
+                      onClick={handleGeneratePrompt}
+                      disabled={narrationIsLoading}
+                    >
+                      {narrationIsLoading ? (
+                        <GiBigGear size="30" className="animate-spin text-amber-400" />
+                      ) : (
+                        <GiAcousticMegaphone size="30" />
+                      )}
+                    </IconButton>
+                  </Tooltip>
+                  <Tooltip content="Reset">
+                    <IconButton
+                      variant="ghost"
+                      color="crimson"
+                      onClick={() => {
+                        setNarrationPrompt(narrationReset.current);
+                        setNarrationOutput(narrationOutputReset.current);
+                      }}
+                    >
+                      <GiCancel size="30" />
+                    </IconButton>
+                  </Tooltip>
+                  <Tooltip content="Replace">
+                    <IconButton variant="ghost" color="grass" 
+                    onClick={handleReplaceNarration}
+                    >
+                      <GiCardExchange size="30" />
+                    </IconButton>
+                  </Tooltip>
+                </div>
+              </div>
+            )}
+          </div>
 
           <Dialog.Close asChild>
             <IconButton className="fixed top-1 right-1" variant="ghost" aria-label="Close">

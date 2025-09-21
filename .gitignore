@@ -48,6 +48,7 @@ gha-creds-*.json
 # local tools
 .github/
 .gemini/
+.specify/
 gemini.md
 session_recovery_script.md
 .Requirements/

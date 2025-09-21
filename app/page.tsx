@@ -231,7 +231,7 @@ export default function Home() {
           {view === "chat" && <Chat />}
 
           <MainMenu />
-          <StateDebugger />
+          <StateDebugger appBackend={appBackend} />
         </>
       )}
 

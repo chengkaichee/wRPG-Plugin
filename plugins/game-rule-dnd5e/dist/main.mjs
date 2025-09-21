@@ -3833,10 +3833,49 @@ var DnDStatsSchema = objectType({
   backstory: stringType().optional()
   // To store the initial character creation backstory
 });
+function suggestDefaultClass(stats) {
+  const { strength, dexterity, constitution, intelligence, wisdom, charisma } = stats;
+  const statArr = [
+    { key: "strength", value: strength },
+    { key: "dexterity", value: dexterity },
+    { key: "constitution", value: constitution },
+    { key: "intelligence", value: intelligence },
+    { key: "wisdom", value: wisdom },
+    { key: "charisma", value: charisma }
+  ];
+  statArr.sort((a, b) => b.value - a.value);
+  const top = statArr[0];
+  const second = statArr[1];
+  switch (top.key) {
+    case "strength":
+      return "Fighter";
+    case "dexterity":
+      if (second.key === "wisdom") return "Ranger";
+      return "Rogue";
+    case "intelligence":
+      return "Wizard";
+    case "constitution":
+      if (second.key === "strength") return "Barbarian";
+      if (second.key === "wisdom") return "Druid";
+      if (second.key === "intelligence") return "Wizard";
+      if (second.key === "charisma") return "Sorcerer";
+      if (second.key === "dexterity") return "Rogue";
+      return "Fighter";
+    case "wisdom":
+      if (second.key === "dexterity") return "Monk";
+      return "Cleric";
+    case "charisma":
+      if (strength >= 13) return "Paladin";
+      if (second.key === "constitution") return "Warlock";
+      return "Bard";
+    default:
+      return "Fighter";
+  }
+}
 var generateDefaultDnDStats = (rpgDiceRoller) => {
   const rollFormula = "4d6dl1";
   const rollAttribute = () => new rpgDiceRoller.DiceRoll(rollFormula).total;
-  const generated = {
+  const generatedStats = {
     strength: rollAttribute(),
     dexterity: rollAttribute(),
     constitution: rollAttribute(),
@@ -3857,7 +3896,11 @@ var generateDefaultDnDStats = (rpgDiceRoller) => {
     encounter: void 0,
     backstory: ""
   };
-  return generated;
+  const suggestedClass = suggestDefaultClass(generatedStats);
+  return __spreadProps(__spreadValues({}, generatedStats), {
+    dndClass: suggestedClass
+    //dndSubclass: suggestedSubclass,
+  });
 };
 var DnDClassData = {
   "Barbarian": [
@@ -4198,7 +4241,7 @@ function getBackstory(stats, pc) {
 
     DO NOT repeat the numerical values of the attributes in your description.
     DO NOT include numerical modifiers or numbers in your description.
-    Use 500 words or less.`
+    Your entire response must be no more than 420 words. Do not exceed this limit. If your answer would be longer, stop at exactly 420 words and do not continue. Do not mention the word count in your answer.`
   };
 }
 var coreSkillsAndDifficultyCheckContent = `
@@ -4368,9 +4411,16 @@ ${checkResult.join("\n")}` : "No specific checks were needed for this action.";
        - altering relationship, 
        - leads to combat, 
        - or disastrous outcome, etc... 
-    Only use 10 words or less per guidance, they must be short, clear and concise of possible ideas based on the situation in one single sentence per check result if it is provided.
-    For example:
-    If the check results is "Stealth check (DC 15): Roll 18 (Success)", you should say "You successfully sneak past the guards unnoticed."
+    Your entire response must be no more than 10 words per guidance. Do not exceed this limit. If your answer would be longer, stop at exactly 10 words per guidance and do not continue. Do not mention the word count in your answer. 
+    They must be short, clear and concise of possible ideas based on the situation in one single sentence per check result if it is provided. For example:
+    ** If the check results is "Stealth check (DC 15): Roll 18 (Success)", you should say "You successfully sneak past the guards unnoticed."
+     
+
+
+******
+
+
+
     If multiple checks are provided, give a separate guidance for each check result.
     If no checks were needed, provide a single concise guidance based on the action and scene like "You agree to join so and so in their quest. so and so are now your ally."
     If the action is trivial (DC 0), it is considered an automatic success, so provide guidance accordingly like "You easily accomplish the task without any issues."
@@ -4398,7 +4448,7 @@ ${checkResult.join("\n")}` : "No specific checks were needed for this action.";
 
 
 
-    Base on these you will only provide objective ANSWERS, in single concise guidance statement of less than 10 words each.
+    Base on these you will only provide objective ANSWERS, in single concise guidance statement of less than 10 words per guidance.
     - Is there any information gained/missed, what information?
     - Is there any item exchanged, what item?
     - Is there any key item lost, what item?
@@ -4406,7 +4456,8 @@ ${checkResult.join("\n")}` : "No specific checks were needed for this action.";
     - Is there any ally or enemy gained/lost, who?
     - Does this lead to combat, chase, or negotiation?
     - Is this consequence ends in a disastrous outcome, what is it?
-    Only use 10 words or less per guidance, they must be short, clear and concise of possible ideas based on the situation in one single sentence per check result if it is provided.
+     Your entire response must be no more than 10 words per guidance. Do not exceed this limit. If your answer would be longer, stop at exactly 10 words per guidance and do not continue. Do not mention the word count in your answer. 
+    They must be short, clear and concise of possible ideas based on the situation in one single sentence per check result if it is provided. 
     
 
 
@@ -4416,6 +4467,13 @@ ${checkResult.join("\n")}` : "No specific checks were needed for this action.";
 
     For example:
     If the check results is "Stealth check (DC 15): Roll 18 (Success)", you should say "You successfully sneak past the guards unnoticed."
+    
+
+
+******
+
+
+
     If multiple checks are provided, give a separate guidance for each check result.
     If no checks were needed, provide a single concise guidance based on the action and scene like "You agree to join so and so in their quest. so and so are now your ally."
     If the action is trivial (DC 0), it is considered an automatic success, so provide guidance accordingly like "You easily accomplish the task without any issues."
@@ -14968,7 +15026,7 @@ var DndStatsCharacterUIPage = ({
       value: currentSettings.backstory || "",
       onChange: (e) => handleChange("backstory", e.target.value),
       rows: 5,
-      placeholder: "Enter prompt guidance for your character's backstory... or leave it blank for the system generate one for you. \n Use simple sentences to highlight the attribute score's interpretation and to describe your character's background, personality, and motivations."
+      placeholder: "Enter prompt guidance for your character's backstory... or leave it blank for the system generate one for you. \r\n Use simple sentences to highlight the attribute score's interpretation and to describe your character's background, personality, and motivations."
     }
   )), /* @__PURE__ */ React.createElement(injectedRadixThemes.Flex, { gap: "2", mt: "4", justify: "end" }, " ", /* @__PURE__ */ React.createElement(injectedRadixThemes.Button, { size: "4", onClick: handleApply }, "Apply Changes"), /* @__PURE__ */ React.createElement(injectedRadixThemes.Button, { size: "4", onClick: () => setCurrentSettings(generateDefaultDnDStats(injectedRpgDiceRoller)), variant: "outline" }, "Re-roll"), " ")));
 };
@@ -15153,7 +15211,7 @@ var DndStatsPlugin = class {
         }
       }
       const locationChangePrompt = getLocationChangePrompt(previousLocationName, newLocationName, newLocationDescription, presentCharactersInfo, newLocationTrigger);
-      const narration = await this.appBackend.getBackend().getNarration(locationChangePrompt);
+      const narration = await this.appBackend.getNarration(locationChangePrompt);
       return [narration];
     }
     let combatNarration = "";
@@ -15255,7 +15313,7 @@ ${combatNarration}`;
         }
       }
       const combatantsPrompt = getCombatantsPrompt(sceneNarration, (globalState == null ? void 0 : globalState.protagonist.name) || "");
-      const combatantsLLMResponse = await this.appBackend.getBackend().getObject(combatantsPrompt, CombatantsLLMSchema);
+      const combatantsLLMResponse = await this.appBackend.getObject(combatantsPrompt, CombatantsLLMSchema);
       const allCombatants = [];
       if (globalState == null ? void 0 : globalState.protagonist) {
         allCombatants.push({
