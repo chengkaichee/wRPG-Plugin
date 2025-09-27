@@ -1,5 +1,5 @@
 import * as z from "zod";
-import type * as RpgDiceRoller from '@dice-roller/rpg-dice-roller';
+import * as RpgDiceRoller from '@dice-roller/rpg-dice-roller';
 import type { CheckDefinition, Character } from "@/lib/state"; // Import CheckDefinition and Character
 import { back } from "@/lib/engine";
 
@@ -300,8 +300,8 @@ export function resolveCheck(check: CheckDefinition, characterStats: Character, 
     case "persuasion":
       abilityScore = dndStats.charisma;
       break;
-    case "initiative": // NEW CASE FOR INITIATIVE
-      abilityScore = dndStats.dexterity; // Initiative uses Dexterity
+    case "initiative":
+      abilityScore = dndStats.dexterity;
       break;
     default:
       // If it's a custom check type not directly mapped to an ability,

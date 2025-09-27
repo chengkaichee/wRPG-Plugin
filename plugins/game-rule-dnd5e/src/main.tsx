@@ -512,12 +512,13 @@ export default class DndStatsPlugin implements Plugin, IGameRuleLogic {
    * @returns {void}
    */
   async handleConsequence(eventType: string, checkResultStatements?: string[], action?: string): Promise<void> {
-    if (!this.settings) {
+    if (!this.settings || !this.appLibs) {
       console.error("ERROR: Plugin: Settings not available for handleConsequence.");
       return;
     }
 
     const PCStats = this.settings as DnDStats;
+    const rpgDiceRoller = this.appLibs.rpgDiceRoller;
 
     // Example: If a "damage_dealt" event, update combatant HP
     if (eventType === "damage_dealt" && checkResultStatements && PCStats.plotType === "combat" && PCStats.encounter) {
@@ -553,7 +554,7 @@ export default class DndStatsPlugin implements Plugin, IGameRuleLogic {
             PCStats.encounter.combatLog = [...PCStats.encounter.combatLog, `${targetName} is dead.`];
             // Check if all enemies are dead to end combat
             const remainingEnemies = PCStats.encounter.combatants.filter(
-              (c: Combatant) => c.status !== "dead" && c.status !== "fled" && c.status !== "surrendered" && c.isFriendly === false
+              (c: Combatant) => c.status === "active" && c.isFriendly === false
             );
             if (remainingEnemies.length === 0) {
               PCStats.encounter.combatLog = [...PCStats.encounter.combatLog, `Combat ends.`];
@@ -605,12 +606,14 @@ export default class DndStatsPlugin implements Plugin, IGameRuleLogic {
 
       // Explicitly add protagonist as a friendly combatant with a special index (-1)
       if (globalState?.protagonist) {
+        const dexterityModifier = Math.floor((PCStats.dexterity - 10) / 2);
+        const initiativeRoll = new rpgDiceRoller.DiceRoll(`1d20+${dexterityModifier}`);
         allCombatants.push({
           characterIndex: -1, // Special index for protagonist
-          currentHp: 10, // Placeholder HP for protagonist, to-do: need to map this to actual stats in settings
-          maxHp: 10, // Placeholder HP for protagonist, to-do: need to map this to actual stats in settings
+          currentHp: PCStats.hp,
+          maxHp: PCStats.hpMax,
           status: "active",
-          initiativeRoll: Math.floor(Math.random() * 20) + 1, // Placeholder initiative and this needs to use actual dexterity modifier from stats with RPGDiceRoller
+          initiativeRoll: initiativeRoll.total,
           isFriendly: true,
         });
       }
@@ -627,12 +630,13 @@ export default class DndStatsPlugin implements Plugin, IGameRuleLogic {
           charIndex = globalState?.characters.length || 0;
           globalState?.characters.push({ ...char, gender: "male", race: "human", biography: "", locationIndex: 0 }); // Placeholder for missing Character properties, to-do: get LLM's description to make the call on what to put here
         }
+        const initiativeRoll = new rpgDiceRoller.DiceRoll(`1d20`);
         allCombatants.push({
           characterIndex: charIndex,
           currentHp: 10, // Placeholder HP, to-do: should be based on hit dice or stats if available
           maxHp: 10, // Placeholder HP, to-do: should be based on hit dice or stats if available
           status: "active",
-          initiativeRoll: Math.floor(Math.random() * 20) + 1, // Placeholder initiative
+          initiativeRoll: initiativeRoll.total,
           isFriendly: true,
         });
       }
@@ -644,12 +648,13 @@ export default class DndStatsPlugin implements Plugin, IGameRuleLogic {
           charIndex = globalState?.characters.length || 0;
           globalState?.characters.push({ ...char, gender: "male", race: "human", biography: "", locationIndex: 0 }); // Placeholder for missing Character properties
         }
+        const initiativeRoll = new rpgDiceRoller.DiceRoll(`1d20`);
         allCombatants.push({
           characterIndex: charIndex,
           currentHp: 10, // Placeholder HP, to-do: should be based on hit dice or stats if available
           maxHp: 10, // Placeholder HP, to-do: should be based on hit dice or stats if available
           status: "active",
-          initiativeRoll: Math.floor(Math.random() * 20) + 1, // Placeholder initiative
+          initiativeRoll: initiativeRoll.total,
           isFriendly: false,
         });
       }
@@ -666,12 +671,13 @@ export default class DndStatsPlugin implements Plugin, IGameRuleLogic {
         };
         let charIndex = globalState?.characters.length || 0;
         globalState?.characters.push(enemyChar);
+        const initiativeRoll = new rpgDiceRoller.DiceRoll(`1d20`);
         allCombatants.push({
           characterIndex: charIndex,
           currentHp: 20, // Placeholder HP
           maxHp: 20, // Placeholder HP
           status: "active",
-          initiativeRoll: Math.floor(Math.random() * 20) + 1, // Placeholder initiative
+          initiativeRoll: initiativeRoll.total,
           isFriendly: false,
         });
       }

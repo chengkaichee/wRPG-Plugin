@@ -70,3 +70,29 @@
 - TypeScript type check passed successfully.
 
 **Conclusion:** T006 is completed.
+
+### Date: September 22, 2025
+
+**Task:** Refactor Initiative Mechanism (Combat Phase 2)
+
+**Outcome:**
+- Refactored the `handleConsequence` function in `plugins/game-rule-dnd5e/src/main.tsx` to correctly calculate initiative rolls, assign `isFriendly` status, identify involved combatants, and manage the `plotType`.
+- Created a new test file `plugins/game-rule-dnd5e/src/initiative.test.tsx` with placeholder tests for the initiative mechanism.
+- Pending test implementation and verification.
+
+# Implementation Journal: Refactor Initiative Mechanism (Combat Phase 2)
+
+## Date: 2025-09-24
+
+### Summary
+This work refactored the combat initiative system within the `game-rule-dnd5e` plugin. The core logic in `main.tsx` and `pluginData.ts` was updated to correctly calculate initiative, determine combatant allegiance, and manage the game's plot state during combat.
+
+### Changes Made
+1.  **Corrected Dice Roller Import**: Fixed a critical bug in `pluginData.ts` by changing the `rpg-dice-roller` import from `import type` to a standard `import`. This ensures the library is available at runtime, resolving the `TypeError: rpgDiceRoller.DiceRoll is not a constructor` error.
+2.  **Refactored Initiative Logic**: The `handleConsequence` function in `main.tsx` was updated to use the `rpg-dice-roller` library to calculate initiative rolls (`1d20` + Dexterity modifier) for all combatants.
+3.  **Improved Combatant Identification**: Logic was enhanced to more accurately identify friendly and enemy combatants based on the narration context that triggers combat.
+4.  **Robust State Management**: The `plotType` is now reliably set to `combat` when initiative is triggered and reverts to `general` when combat ends.
+5.  **Test Verification**: The Jest test suite in `initiative.test.tsx` was corrected and used to verify all the above changes. The tests now pass, confirming the new implementation is working as expected.
+
+### Outcome
+The initiative system is now functional and robust. All changes are contained within the `game-rule-dnd5e` plugin, and all related tests are passing.

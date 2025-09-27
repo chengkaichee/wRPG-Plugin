@@ -56,3 +56,11 @@ specs/
 scripts/
 memory/
 templates/
+.eslintrc.json
+jest.config.js
+playwright.config.ts
+setupTests.ts
+/tests/
+*.test.tsx
+playwright-report/
+test-results/

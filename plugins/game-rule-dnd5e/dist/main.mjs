@@ -15246,11 +15246,12 @@ ${combatNarration}`;
    */
   async handleConsequence(eventType, checkResultStatements, action) {
     var _a;
-    if (!this.settings) {
+    if (!this.settings || !this.appLibs) {
       console.error("ERROR: Plugin: Settings not available for handleConsequence.");
       return;
     }
     const PCStats = this.settings;
+    const rpgDiceRoller = this.appLibs.rpgDiceRoller;
     if (eventType === "damage_dealt" && checkResultStatements && PCStats.plotType === "combat" && PCStats.encounter) {
       const damageRegex = /dealt (\d+) (\w+) damage to (\w+)/;
       const match = checkResultStatements[0].match(damageRegex);
@@ -15276,7 +15277,7 @@ ${combatNarration}`;
             targetCombatant.status = "dead";
             PCStats.encounter.combatLog = [...PCStats.encounter.combatLog, `${targetName} is dead.`];
             const remainingEnemies = PCStats.encounter.combatants.filter(
-              (c) => c.status !== "dead" && c.status !== "fled" && c.status !== "surrendered" && c.isFriendly === false
+              (c) => c.status === "active" && c.isFriendly === false
             );
             if (remainingEnemies.length === 0) {
               PCStats.encounter.combatLog = [...PCStats.encounter.combatLog, `Combat ends.`];
@@ -15316,16 +15317,15 @@ ${combatNarration}`;
       const combatantsLLMResponse = await this.appBackend.getObject(combatantsPrompt, CombatantsLLMSchema);
       const allCombatants = [];
       if (globalState == null ? void 0 : globalState.protagonist) {
+        const dexterityModifier = Math.floor((PCStats.dexterity - 10) / 2);
+        const initiativeRoll = new rpgDiceRoller.DiceRoll(`1d20+${dexterityModifier}`);
         allCombatants.push({
           characterIndex: -1,
           // Special index for protagonist
-          currentHp: 10,
-          // Placeholder HP for protagonist, to-do: need to map this to actual stats in settings
-          maxHp: 10,
-          // Placeholder HP for protagonist, to-do: need to map this to actual stats in settings
+          currentHp: PCStats.hp,
+          maxHp: PCStats.hpMax,
           status: "active",
-          initiativeRoll: Math.floor(Math.random() * 20) + 1,
-          // Placeholder initiative and this needs to use actual dexterity modifier from stats with RPGDiceRoller
+          initiativeRoll: initiativeRoll.total,
           isFriendly: true
         });
       }
@@ -15338,6 +15338,7 @@ ${combatNarration}`;
           charIndex = (globalState == null ? void 0 : globalState.characters.length) || 0;
           globalState == null ? void 0 : globalState.characters.push(__spreadProps(__spreadValues({}, char), { gender: "male", race: "human", biography: "", locationIndex: 0 }));
         }
+        const initiativeRoll = new rpgDiceRoller.DiceRoll(`1d20`);
         allCombatants.push({
           characterIndex: charIndex,
           currentHp: 10,
@@ -15345,8 +15346,7 @@ ${combatNarration}`;
           maxHp: 10,
           // Placeholder HP, to-do: should be based on hit dice or stats if available
           status: "active",
-          initiativeRoll: Math.floor(Math.random() * 20) + 1,
-          // Placeholder initiative
+          initiativeRoll: initiativeRoll.total,
           isFriendly: true
         });
       }
@@ -15356,6 +15356,7 @@ ${combatNarration}`;
           charIndex = (globalState == null ? void 0 : globalState.characters.length) || 0;
           globalState == null ? void 0 : globalState.characters.push(__spreadProps(__spreadValues({}, char), { gender: "male", race: "human", biography: "", locationIndex: 0 }));
         }
+        const initiativeRoll = new rpgDiceRoller.DiceRoll(`1d20`);
         allCombatants.push({
           characterIndex: charIndex,
           currentHp: 10,
@@ -15363,8 +15364,7 @@ ${combatNarration}`;
           maxHp: 10,
           // Placeholder HP, to-do: should be based on hit dice or stats if available
           status: "active",
-          initiativeRoll: Math.floor(Math.random() * 20) + 1,
-          // Placeholder initiative
+          initiativeRoll: initiativeRoll.total,
           isFriendly: false
         });
       }
@@ -15383,6 +15383,7 @@ ${combatNarration}`;
         };
         let charIndex = (globalState == null ? void 0 : globalState.characters.length) || 0;
         globalState == null ? void 0 : globalState.characters.push(enemyChar);
+        const initiativeRoll = new rpgDiceRoller.DiceRoll(`1d20`);
         allCombatants.push({
           characterIndex: charIndex,
           currentHp: 20,
@@ -15390,8 +15391,7 @@ ${combatNarration}`;
           maxHp: 20,
           // Placeholder HP
           status: "active",
-          initiativeRoll: Math.floor(Math.random() * 20) + 1,
-          // Placeholder initiative
+          initiativeRoll: initiativeRoll.total,
           isFriendly: false
         });
       }
